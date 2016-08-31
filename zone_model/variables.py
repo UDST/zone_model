@@ -36,29 +36,9 @@ def zones_jobs(zones, jobs):
 def ln_residential(zones):
     return zones.residential_units.apply(np.log1p)
     
-@orca.column('zones', 'b_id', cache=True)
-def b_id(zones):
+@orca.column('zones', 'z_id', cache=True)
+def z_id(zones):
     return zones.index
-
-@orca.column('zones', 'state_id', cache=True)
-def state_id(zones):
-    zones = zones.to_frame(zones.local_columns)
-    return pd.Series(zones.index.values, index = zones.index).str.slice(0,2)
-    
-@orca.column('zones', 'county_id', cache=True)
-def county_id(zones):
-    zones = zones.to_frame(zones.local_columns)
-    return pd.Series(zones.index.values, index = zones.index).str.slice(0,5)
-    
-@orca.column('zones', 'tract_id', cache=True)
-def tract_id(zones):
-    zones = zones.to_frame(zones.local_columns)
-    return pd.Series(zones.index.values, index = zones.index).str.slice(0,11)
-    
-@orca.column('zones', 'block_group_id', cache=True)
-def block_group_id(zones):
-    zones = zones.to_frame(zones.local_columns)
-    return pd.Series(zones.index.values, index = zones.index).str.slice(0,12)
 
 @orca.column('zones', 'acres', cache=True)
 def acres(zones):
