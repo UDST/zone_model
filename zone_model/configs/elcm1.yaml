@@ -1,0 +1,67 @@
+name: MNLDiscreteChoiceModel
+
+model_type: discretechoice
+
+choosers_fit_filters: null
+
+choosers_predict_filters: aggr_sector_id == 1
+
+alts_fit_filters: null
+
+alts_predict_filters: null
+
+interaction_predict_filters: null
+
+choice_column: block_id
+
+sample_size: 50
+
+estimation_sample_size: 1000
+
+prediction_sample_size: null
+
+model_expression: !!set
+    block_groups_ratio_households_to_residential_units: null
+    density_households: null
+    nodes_ave_year_built_5000m: null
+    nodes_jobs_10km: null
+    nodes_jobs_5000m_agg3: null
+    pumas_mean_income: null
+    res_btype_mode4: null
+
+fitted: true
+
+choice_mode: aggregate
+
+fit_parameters:
+    Coefficient:
+        block_groups_ratio_households_to_residential_units: 3.0
+        density_households: -0.5255047583670021
+        nodes_ave_year_built_5000m: 0.012358040211605817
+        nodes_jobs_10km: 0.1349014405019138
+        nodes_jobs_5000m_agg3: 0.18996975805162353
+        pumas_mean_income: 2.1936060231867753e-05
+        res_btype_mode4: 0.8223372597630874
+    Std. Error:
+        block_groups_ratio_households_to_residential_units: 0.7656609533376514
+        density_households: 0.03367779620016603
+        nodes_ave_year_built_5000m: 0.0005026842597210641
+        nodes_jobs_10km: 0.03590110971049362
+        nodes_jobs_5000m_agg3: 0.026720929598673452
+        pumas_mean_income: 1.1387046497144654e-05
+        res_btype_mode4: 0.1103243465935277
+    T-Score:
+        block_groups_ratio_households_to_residential_units: 3.9181833511588517
+        density_households: -15.60389389031374
+        nodes_ave_year_built_5000m: 24.584100203302974
+        nodes_jobs_10km: 3.7575841412635533
+        nodes_jobs_5000m_agg3: 7.109399295040038
+        pumas_mean_income: 1.9264047299155498
+        res_btype_mode4: 7.453814911706267
+
+probability_mode: single_chooser
+
+log_likelihoods:
+    convergence: -3591.132272466609
+    'null': -3912.023005428176
+    ratio: 0.08202680109915284

@@ -1,0 +1,17 @@
+{alts_fit_filters: null, alts_predict_filters: null, choice_column: block_id, choice_mode: aggregate,
+  choosers_fit_filters: year_built > 2000, choosers_predict_filters: building_type_id
+    == 2, estimation_sample_size: 1000, fit_parameters: {Coefficient: {block_groups_median_year_built: 0.03825040704950756,
+      county_id_is_27009: -0.06, county_id_is_27141: -0.06, county_id_is_27145: 0.06,
+      nodes_jobs_10km: 0.16057895182676496, res_btype_mode1: 2.641813200939481, tracts_density_households: -0.7379119845624234,
+      tracts_median_rent: 0.0014996069932054973}, Std. Error: {block_groups_median_year_built: 0.0001489848874612209,
+      nodes_jobs_10km: 0.03597503573357215, res_btype_mode1: 0.17988453639543406,
+      tracts_density_households: 0.20702125898060025, tracts_median_rent: 0.00020351606976802322},
+    T-Score: {block_groups_median_year_built: 256.7401815131331, nodes_jobs_10km: 4.463621746368735,
+      res_btype_mode1: 14.686160655477762, tracts_density_households: -3.564426128002498,
+      tracts_median_rent: 7.368494266397818}}, fitted: true, interaction_predict_filters: null,
+  log_likelihoods: {convergence: -1745.0815839492188, 'null': -2124.228491947497,
+    ratio: 0.1784868762638031}, model_expression: !!set {block_groups_median_year_built: null,
+    county_id_is_27009: null, county_id_is_27141: null, county_id_is_27145: null,
+    nodes_jobs_10km: null, res_btype_mode1: null, tracts_density_households: null,
+    tracts_median_rent: null}, model_type: discretechoice, name: MNLDiscreteChoiceModel,
+  prediction_sample_size: null, probability_mode: single_chooser, sample_size: 50}

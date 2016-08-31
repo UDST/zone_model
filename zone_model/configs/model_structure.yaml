@@ -1,0 +1,68 @@
+template: zone
+
+geography: zones
+
+geography_id: zone_id
+
+models: 
+
+    elcm:
+        model_type: location_choice
+        agents_name: jobs
+        alternatives_id_name: zone_id
+        alternatives_name: zones
+        choosers_fit_filter: null
+        segmentation_variable: aggr_sector_id
+
+    hlcm: 
+        model_type: location_choice
+        agents_name: households
+        alternatives_id_name: zone_id
+        alternatives_name: zones
+        choosers_fit_filter: recent_mover == 1
+        segmentation_variable: income_quartile
+
+    rdplcm: 
+        model_type: location_choice
+        agents_name: residential_units
+        alternatives_id_name: zone_id
+        alternatives_name: zones
+        choosers_fit_filter: year_built > 2000
+        segmentation_variable: building_type_id
+
+    repm_rent:
+        model_type: regression
+        observations_name: zones
+        dep_var: res_rents
+        fit_filters: [res_rents > 0, rent_impute==0]
+        segmentation_variable: all_zones
+        var_filter_terms: [value, rent]
+
+    repm_value:
+        model_type: regression
+        observations_name: zones
+        dep_var: res_values
+        fit_filters: [res_values > 0, value_impute==0]
+        segmentation_variable: all_zones
+        var_filter_terms: [value, rent]
+
+model_order:
+    - elcm
+    - hlcm
+    - rdplcm
+    - repm_rent
+    - repm_value
+
+supporting_steps:
+    elcm: [jobs_transition_basic]
+    hlcm: [households_transition_basic]
+    rdplcm: [residential_unit_transition_basic]
+    repm_rent: []
+    repm_value: []
+    tracking: [sim_progress_by_step]
+    pre_processing: [build_networks]
+    post_processing: [calibration_indicators]
+
+calibration:
+    calibration_geography: pumas
+    calibration_geography_id: puma10_id

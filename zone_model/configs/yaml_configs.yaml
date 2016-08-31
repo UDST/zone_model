@@ -1,0 +1,25 @@
+rdplcm:
+- rdplcm1.yaml
+- rdplcm4.yaml
+- rdplcm3.yaml
+- rdplcm2.yaml
+
+hlcm:
+- hlcm1.yaml
+- hlcm3.yaml
+- hlcm4.yaml
+- hlcm2.yaml
+
+repm_rent:
+- repm_rent1.yaml
+
+repm_value:
+- repm_value1.yaml
+
+elcm:
+- elcm5.yaml
+- elcm1.yaml
+- elcm3.yaml
+- elcm2.yaml
+- elcm0.yaml
+- elcm4.yaml

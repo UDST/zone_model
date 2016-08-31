@@ -1,0 +1,71 @@
+name: MNLDiscreteChoiceModel
+
+model_type: discretechoice
+
+choosers_fit_filters: recent_mover == 1
+
+choosers_predict_filters: income_quartile == 1
+
+alts_fit_filters: null
+
+alts_predict_filters: null
+
+interaction_predict_filters: null
+
+choice_column: block_id
+
+sample_size: 50
+
+estimation_sample_size: 1000
+
+prediction_sample_size: null
+
+model_expression: !!set
+    block_groups_mean_value: null
+    counties_median_income: null
+    nodes_households_25km: null
+    nodes_jobs_10km: null
+    nodes_post2000_du_800m: null
+    ratio_households_to_residential_units: null
+    res_btype_mode4: null
+    tracts_density_jobs: null
+
+fitted: true
+
+choice_mode: aggregate
+
+fit_parameters:
+    Coefficient:
+        block_groups_mean_value: -9.813487620725767e-06
+        counties_median_income: 3.413492339734442e-05
+        nodes_households_25km: 0.06713190962270646
+        nodes_jobs_10km: 0.23504151049934868
+        nodes_post2000_du_800m: 0.34605202521579675
+        ratio_households_to_residential_units: 3.0
+        res_btype_mode4: 1.9102105996684473
+        tracts_density_jobs: 0.06455782240055068
+    Std. Error:
+        block_groups_mean_value: 9.5980861031988e-07
+        counties_median_income: 4.784978492086634e-06
+        nodes_households_25km: 0.07222118037824195
+        nodes_jobs_10km: 0.05795216552212609
+        nodes_post2000_du_800m: 0.030237000035510872
+        ratio_households_to_residential_units: 0.3791845390214436
+        res_btype_mode4: 0.0793948888634687
+        tracts_density_jobs: 0.009975109778285675
+    T-Score:
+        block_groups_mean_value: -10.224421322345899
+        counties_median_income: 7.133767362548554
+        nodes_households_25km: 0.9295321576180063
+        nodes_jobs_10km: 4.0557847732128325
+        nodes_post2000_du_800m: 11.44465472134759
+        ratio_households_to_residential_units: 7.911714986433939
+        res_btype_mode4: 24.059616771469233
+        tracts_density_jobs: 6.471890920046155
+
+probability_mode: single_chooser
+
+log_likelihoods:
+    convergence: -2294.6676779193713
+    'null': -3912.023005428176
+    ratio: 0.4134319571394707

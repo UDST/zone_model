@@ -1,0 +1,21 @@
+{alts_fit_filters: null, alts_predict_filters: null, choice_column: block_id, choice_mode: aggregate,
+  choosers_fit_filters: recent_mover == 1, choosers_predict_filters: income_quartile
+    == 1, estimation_sample_size: 1000, fit_parameters: {Coefficient: {block_groups_density_jobs: 0.03012068921607972,
+      counties_median_income: 6.0593741182796245e-06, county_id_is_27009: 0.06, county_id_is_27141: 0.06,
+      county_id_is_27145: -0.06, mean_value: -7.585899719224698e-06, nodes_jobs_10km: 0.16846853961889538,
+      nodes_post2000_du_800m: 0.17195834998486512, ratio_households_to_residential_units: 3.0,
+      res_btype_mode4: 1.2410072271577224, total_households: 0.01615006476594908},
+    Std. Error: {block_groups_density_jobs: 0.0069466630020741885, counties_median_income: 4.688487939530929e-06,
+      mean_value: 8.363144679017341e-07, nodes_jobs_10km: 0.02211756576630795, nodes_post2000_du_800m: 0.032370996737866656,
+      ratio_households_to_residential_units: 0.34165597377138396, res_btype_mode4: 0.08890797871736135,
+      total_households: 0.0004954522861623494}, T-Score: {block_groups_density_jobs: 4.335994017139748,
+      counties_median_income: 1.2923940930273246, mean_value: -9.07063073804916, nodes_jobs_10km: 7.616956648797503,
+      nodes_post2000_du_800m: 5.312111683719433, ratio_households_to_residential_units: 8.78076261007344,
+      res_btype_mode4: 13.958333605838538, total_households: 32.59660963731438}},
+  fitted: true, interaction_predict_filters: null, log_likelihoods: {convergence: -1978.4686301461547,
+    'null': -3912.023005428176, ratio: 0.49425945926163883}, model_expression: !!set {
+    block_groups_density_jobs: null, counties_median_income: null, county_id_is_27009: null,
+    county_id_is_27141: null, county_id_is_27145: null, mean_value: null, nodes_jobs_10km: null,
+    nodes_post2000_du_800m: null, ratio_households_to_residential_units: null, res_btype_mode4: null,
+    total_households: null}, model_type: discretechoice, name: MNLDiscreteChoiceModel,
+  prediction_sample_size: null, probability_mode: single_chooser, sample_size: 50}

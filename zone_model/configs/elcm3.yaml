@@ -1,0 +1,67 @@
+name: MNLDiscreteChoiceModel
+
+model_type: discretechoice
+
+choosers_fit_filters: null
+
+choosers_predict_filters: aggr_sector_id == 3
+
+alts_fit_filters: null
+
+alts_predict_filters: null
+
+interaction_predict_filters: null
+
+choice_column: block_id
+
+sample_size: 50
+
+estimation_sample_size: 1000
+
+prediction_sample_size: null
+
+model_expression: !!set
+    density_jobs: null
+    median_income: null
+    nodes_jobs_10km: null
+    nodes_jobs_5000m_22: null
+    nodes_post2000_du_3000m: null
+    pumas_total_jobs: null
+    res_btype_mode1: null
+
+fitted: true
+
+choice_mode: aggregate
+
+fit_parameters:
+    Coefficient:
+        density_jobs: 0.023489075500147165
+        median_income: 1.7942125710994771e-06
+        nodes_jobs_10km: 0.13284527668724916
+        nodes_jobs_5000m_22: 0.1436722654209782
+        nodes_post2000_du_3000m: 0.5082309050202788
+        pumas_total_jobs: 7.247418209956917e-06
+        res_btype_mode1: -0.7254274566641623
+    Std. Error:
+        density_jobs: 0.0007017967067617942
+        median_income: 7.737489142073408e-07
+        nodes_jobs_10km: 0.028919719314846555
+        nodes_jobs_5000m_22: 0.027143227231201935
+        nodes_post2000_du_3000m: 0.04454442758597607
+        pumas_total_jobs: 1.957695226855913e-06
+        res_btype_mode1: 0.07339603999295029
+    T-Score:
+        density_jobs: 33.46991411306222
+        median_income: 2.3188563345998876
+        nodes_jobs_10km: 4.5935880373171605
+        nodes_jobs_5000m_22: 5.293116555271759
+        nodes_post2000_du_3000m: 11.409528252200174
+        pumas_total_jobs: 3.7020155693980907
+        res_btype_mode1: -9.883741094667231
+
+probability_mode: single_chooser
+
+log_likelihoods:
+    convergence: -2922.3541749490632
+    'null': -3912.023005428176
+    ratio: 0.25298134216130264

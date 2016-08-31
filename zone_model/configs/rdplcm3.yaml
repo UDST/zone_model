@@ -1,0 +1,67 @@
+name: MNLDiscreteChoiceModel
+
+model_type: discretechoice
+
+choosers_fit_filters: year_built > 2000
+
+choosers_predict_filters: building_type_id == 3
+
+alts_fit_filters: null
+
+alts_predict_filters: null
+
+interaction_predict_filters: null
+
+choice_column: block_id
+
+sample_size: 50
+
+estimation_sample_size: 1000
+
+prediction_sample_size: null
+
+model_expression: !!set
+    block_groups_density_jobs: null
+    median_year_built: null
+    nodes_ave_rent_400m: null
+    nodes_high_income_hh_1500m: null
+    nodes_jobs_10km: null
+    res_btype_mode4: null
+    total_households: null
+
+fitted: true
+
+choice_mode: aggregate
+
+fit_parameters:
+    Coefficient:
+        block_groups_density_jobs: -0.2045016319645558
+        median_year_built: 0.054733873476082044
+        nodes_ave_rent_400m: 2.1553119140796695
+        nodes_high_income_hh_1500m: 0.13501089271173178
+        nodes_jobs_10km: 0.11932517964414846
+        res_btype_mode4: 0.9561915906263599
+        total_households: 0.01322949482509579
+    Std. Error:
+        block_groups_density_jobs: 0.03795768388911987
+        median_year_built: 0.00040500755512399417
+        nodes_ave_rent_400m: 0.12493487344873756
+        nodes_high_income_hh_1500m: 0.04011701814795527
+        nodes_jobs_10km: 0.02627260357998877
+        res_btype_mode4: 0.10536483271785368
+        total_households: 0.0005891405346511233
+    T-Score:
+        block_groups_density_jobs: -5.387621451349244
+        median_year_built: 135.14284556821445
+        nodes_ave_rent_400m: 17.251483549659355
+        nodes_high_income_hh_1500m: 3.3654269171701428
+        nodes_jobs_10km: 4.541810227557183
+        res_btype_mode4: 9.075054417699814
+        total_households: 22.455584104274916
+
+probability_mode: single_chooser
+
+log_likelihoods:
+    convergence: -2620.300444921803
+    'null': -3912.023005428176
+    ratio: 0.33019298677794773

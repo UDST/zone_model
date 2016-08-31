@@ -1,0 +1,71 @@
+name: MNLDiscreteChoiceModel
+
+model_type: discretechoice
+
+choosers_fit_filters: recent_mover == 1
+
+choosers_predict_filters: income_quartile == 2
+
+alts_fit_filters: null
+
+alts_predict_filters: null
+
+interaction_predict_filters: null
+
+choice_column: block_id
+
+sample_size: 50
+
+estimation_sample_size: 1000
+
+prediction_sample_size: null
+
+model_expression: !!set
+    counties_total_households: null
+    density_households: null
+    mean_value: null
+    nodes_jobs_15km: null
+    nodes_post2000_du_800m: null
+    pumas_median_income: null
+    ratio_households_to_residential_units: null
+    res_btype_mode4: null
+
+fitted: true
+
+choice_mode: aggregate
+
+fit_parameters:
+    Coefficient:
+        counties_total_households: 3.9707548449211025e-05
+        density_households: 0.1122668760457983
+        mean_value: -3.7629904007223337e-06
+        nodes_jobs_15km: 0.20192187543290008
+        nodes_post2000_du_800m: 0.34249508995044614
+        pumas_median_income: 0.00019238815211585782
+        ratio_households_to_residential_units: 3.0
+        res_btype_mode4: 1.307742982272822
+    Std. Error:
+        counties_total_households: 2.2653588820689113e-06
+        density_households: 0.007066858965436177
+        mean_value: 8.354700510039236e-07
+        nodes_jobs_15km: 0.027174292853848526
+        nodes_post2000_du_800m: 0.027213659554368115
+        pumas_median_income: 6.047326913063222e-06
+        ratio_households_to_residential_units: 0.36635781115363103
+        res_btype_mode4: 0.08370883830668992
+    T-Score:
+        counties_total_households: 17.528149187976272
+        density_households: 15.886389780083721
+        mean_value: -4.504039847030569
+        nodes_jobs_15km: 7.430621157978105
+        nodes_post2000_du_800m: 12.585410986942094
+        pumas_median_income: 31.81375091534538
+        ratio_households_to_residential_units: 8.188715809151832
+        res_btype_mode4: 15.622519780785305
+
+probability_mode: single_chooser
+
+log_likelihoods:
+    convergence: -2603.850193679852
+    'null': -3912.023005428176
+    ratio: 0.33439803649752375
