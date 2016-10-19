@@ -59,10 +59,5 @@ supporting_steps:
     rdplcm: [residential_unit_transition_basic]
     repm_rent: []
     repm_value: []
-    tracking: [sim_progress_by_step]
     pre_processing: [build_networks]
-    post_processing: [calibration_indicators]
-
-calibration:
-    calibration_geography: pumas
-    calibration_geography_id: puma10_id
+    post_processing: []

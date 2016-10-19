@@ -142,20 +142,6 @@ def step_sequence(pod = None, core_models_only=False):
     if core_models_only:
         return config_sequence
 
-    try:
-        refine = orca.get_injectable('refine')
-        supporting_steps['post_processing'].insert(0, refine)
-    except:
-        refine = False
-    try:
-        sched_dev = orca.get_injectable('sched_dev')
-        supporting_steps['pre_processing'].insert(0, sched_dev)
-    except:
-        sched_dev = False
-
-    if orca.get_injectable('tracking'):
-        model_sequence = [step for pair in zip(model_sequence,supporting_steps['tracking']*len(model_sequence)) for step in pair]
-
     model_sequence = supporting_steps['pre_processing'] + model_sequence + supporting_steps['post_processing']
     return model_sequence
 

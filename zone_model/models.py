@@ -6,6 +6,7 @@ import pandas as pd
 import orca
 import pandana as pdna
 from urbansim.utils import misc
+from urbansim.utils import yamlio
 from urbansim.utils import networks
 from urbansim.models import transition
 from urbansim.models import RegressionModel
@@ -15,7 +16,6 @@ from urbansim.models import SegmentedMNLDiscreteChoiceModel
 import utils
 import datasources
 import variables
-import output
 import changesets
 
 geography_base_id = orca.get_injectable('geography_id')
@@ -418,3 +418,45 @@ def make_repm_func(model_name, yaml_file):
                                       [], dep_var)
     return func
 
+
+def register_fitted_models():
+    yaml_cfg = yamlio.yaml_to_dict(str_or_buffer='./configs/yaml_configs.yaml')
+    hlcm = register_orca_steps_for_segmented_model(yaml_cfg['hlcm'], make_hlcm_func)
+    elcm = register_orca_steps_for_segmented_model(yaml_cfg['elcm'], make_elcm_func)
+    rdplcm = register_orca_steps_for_segmented_model(yaml_cfg['rdplcm'], make_rdplcm_func)
+    rent_repm = register_orca_steps_for_segmented_model(yaml_cfg['repm_rent'], make_repm_func)
+    value_repm = register_orca_steps_for_segmented_model(yaml_cfg['repm_value'], make_repm_func)
+
+
+def register_orca_steps_for_segmented_model(model_yaml_filenames, model_generator):
+    """
+    Register model functions as orca steps, for a given list of YAML configurations.
+
+    Parameters
+    ----------
+    model_yaml_filenames : list of str
+        List of YAML filenames to register as orca steps. Typically each YAML file
+        refers to one auto-fited segment of a segmented model.
+    model_generator : function
+        Generator function for creating and registering model functions.
+
+    Returns
+    -------
+    model : list of str
+        List of model names that have been registered with orca.
+
+    """
+    model = []
+    for yaml_file in model_yaml_filenames:
+        print yaml_file
+        model_name = yaml_file.split('.')[0]
+        model.append(model_name)
+
+        # Create LCM function and register with orca
+        model_generator(model_name, yaml_file)
+
+    print model
+    return model
+
+
+register_fitted_models()
