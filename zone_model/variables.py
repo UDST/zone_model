@@ -152,6 +152,14 @@ def puma10_id(jobs, zones):
 def county_id(jobs, zones):
     return misc.reindex(zones.county_id, jobs[geography_base_id]).fillna(0)
 
+@orca.column('jobs', 'x', cache=True, cache_scope='iteration')
+def x(jobs, zones):
+    return misc.reindex(zones.x, jobs[geography_base_id]).fillna(0)
+
+@orca.column('jobs', 'y', cache=True, cache_scope='iteration')
+def y(jobs, zones):
+    return misc.reindex(zones.y, jobs[geography_base_id]).fillna(0)
+
 
 #####################
 # ZONE VARIABLES 2
@@ -324,6 +332,14 @@ def puma10_id(residential_units, zones):
 @orca.column('residential_units', 'county_id', cache=True, cache_scope='iteration')
 def county_id(residential_units, zones):
     return misc.reindex(zones.county_id, residential_units[geography_base_id]).fillna(0)
+
+@orca.column('residential_units', 'x', cache=True, cache_scope='iteration')
+def x(residential_units, zones):
+    return misc.reindex(zones.x, residential_units[geography_base_id]).fillna(0)
+
+@orca.column('residential_units', 'y', cache=True, cache_scope='iteration')
+def y(residential_units, zones):
+    return misc.reindex(zones.y, residential_units[geography_base_id]).fillna(0)
 
 
 #####################
