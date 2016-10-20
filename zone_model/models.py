@@ -448,14 +448,11 @@ def register_orca_steps_for_segmented_model(model_yaml_filenames, model_generato
     """
     model = []
     for yaml_file in model_yaml_filenames:
-        print yaml_file
         model_name = yaml_file.split('.')[0]
         model.append(model_name)
 
         # Create LCM function and register with orca
         model_generator(model_name, yaml_file)
-
-    print model
     return model
 
 

@@ -108,6 +108,14 @@ def puma10_id(households, zones):
 @orca.column('households', 'county_id', cache=True, cache_scope='iteration')
 def county_id(households, zones):
     return misc.reindex(zones.county_id, households[geography_base_id]).fillna(0)
+
+@orca.column('households', 'x', cache=True, cache_scope='iteration')
+def x(households, zones):
+    return misc.reindex(zones.x, households[geography_base_id]).fillna(0)
+
+@orca.column('households', 'y', cache=True, cache_scope='iteration')
+def y(households, zones):
+    return misc.reindex(zones.y, households[geography_base_id]).fillna(0)
     
 #####################
 # JOB VARIABLES
