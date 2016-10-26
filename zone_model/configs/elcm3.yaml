@@ -12,7 +12,7 @@ alts_predict_filters: null
 
 interaction_predict_filters: null
 
-choice_column: block_id
+choice_column: zone_id
 
 sample_size: 50
 
@@ -21,13 +21,11 @@ estimation_sample_size: 1000
 prediction_sample_size: null
 
 model_expression: !!set
-    density_jobs: null
-    median_income: null
+    mean_year_built: null
     nodes_jobs_10km: null
-    nodes_jobs_5000m_22: null
-    nodes_post2000_du_3000m: null
-    pumas_total_jobs: null
+    nodes_jobs_5000m_4849: null
     res_btype_mode1: null
+    total_jobs: null
 
 fitted: true
 
@@ -35,33 +33,27 @@ choice_mode: aggregate
 
 fit_parameters:
     Coefficient:
-        density_jobs: 0.023489075500147165
-        median_income: 1.7942125710994771e-06
-        nodes_jobs_10km: 0.13284527668724916
-        nodes_jobs_5000m_22: 0.1436722654209782
-        nodes_post2000_du_3000m: 0.5082309050202788
-        pumas_total_jobs: 7.247418209956917e-06
-        res_btype_mode1: -0.7254274566641623
+        mean_year_built: 0.020999876037239133
+        nodes_jobs_10km: 0.18984715387855342
+        nodes_jobs_5000m_4849: -0.0090212593671586
+        res_btype_mode1: -0.32794301104523466
+        total_jobs: 0.00018672218734876983
     Std. Error:
-        density_jobs: 0.0007017967067617942
-        median_income: 7.737489142073408e-07
-        nodes_jobs_10km: 0.028919719314846555
-        nodes_jobs_5000m_22: 0.027143227231201935
-        nodes_post2000_du_3000m: 0.04454442758597607
-        pumas_total_jobs: 1.957695226855913e-06
-        res_btype_mode1: 0.07339603999295029
+        mean_year_built: 0.0001875625854045852
+        nodes_jobs_10km: 0.03859695988974636
+        nodes_jobs_5000m_4849: 0.0243632429639472
+        res_btype_mode1: 0.07625711552543873
+        total_jobs: 9.41648667191863e-06
     T-Score:
-        density_jobs: 33.46991411306222
-        median_income: 2.3188563345998876
-        nodes_jobs_10km: 4.5935880373171605
-        nodes_jobs_5000m_22: 5.293116555271759
-        nodes_post2000_du_3000m: 11.409528252200174
-        pumas_total_jobs: 3.7020155693980907
-        res_btype_mode1: -9.883741094667231
+        mean_year_built: 111.96196721185613
+        nodes_jobs_10km: 4.918707442784583
+        nodes_jobs_5000m_4849: -0.37028154997708174
+        res_btype_mode1: -4.300490633373559
+        total_jobs: 19.829283877776124
 
 probability_mode: single_chooser
 
 log_likelihoods:
-    convergence: -2922.3541749490632
+    convergence: -3597.546777858386
     'null': -3912.023005428176
-    ratio: 0.25298134216130264
+    ratio: 0.0803871109994585

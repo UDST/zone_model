@@ -33,16 +33,16 @@ models:
     repm_rent:
         model_type: regression
         observations_name: zones
-        dep_var: res_rents
-        fit_filters: [res_rents > 0, rent_impute==0]
+        dep_var: res_rent
+        fit_filters: [res_rent > 0]
         segmentation_variable: all_zones
         var_filter_terms: [value, rent]
 
     repm_value:
         model_type: regression
         observations_name: zones
-        dep_var: res_values
-        fit_filters: [res_values > 0, value_impute==0]
+        dep_var: res_value
+        fit_filters: [res_value > 0]
         segmentation_variable: all_zones
         var_filter_terms: [value, rent]
 

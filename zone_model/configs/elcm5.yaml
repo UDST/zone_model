@@ -12,7 +12,7 @@ alts_predict_filters: null
 
 interaction_predict_filters: null
 
-choice_column: block_id
+choice_column: zone_id
 
 sample_size: 50
 
@@ -21,12 +21,11 @@ estimation_sample_size: 1000
 prediction_sample_size: null
 
 model_expression: !!set
-    density_jobs: null
-    nodes_high_income_hh_3000m: null
+    density_households: null
+    mean_year_built: null
     nodes_jobs_10km: null
-    nodes_jobs_5000m_agg3: null
-    res_btype_mode3: null
-    tracts_mean_year_built: null
+    nodes_jobs_5000m_56: null
+    res_btype_mode2: null
 
 fitted: true
 
@@ -34,30 +33,27 @@ choice_mode: aggregate
 
 fit_parameters:
     Coefficient:
-        density_jobs: 0.03550355010069086
-        nodes_high_income_hh_3000m: 0.1601886911978826
-        nodes_jobs_10km: 0.21917578848837713
-        nodes_jobs_5000m_agg3: 0.1973564855237356
-        res_btype_mode3: -0.7654558710814096
-        tracts_mean_year_built: 0.02704864280750151
+        density_households: -0.016386942683394818
+        mean_year_built: 0.01432310154508792
+        nodes_jobs_10km: 0.25425805540607427
+        nodes_jobs_5000m_56: 0.3371886620761602
+        res_btype_mode2: 0.270809176984807
     Std. Error:
-        density_jobs: 0.0006326705424407941
-        nodes_high_income_hh_3000m: 0.049416034348591306
-        nodes_jobs_10km: 0.04574302335018334
-        nodes_jobs_5000m_agg3: 0.04164152131143067
-        res_btype_mode3: 0.2679672284979595
-        tracts_mean_year_built: 0.00012909701340480843
+        density_households: 0.007844131661512765
+        mean_year_built: 0.00019099590426897918
+        nodes_jobs_10km: 0.05111162230141275
+        nodes_jobs_5000m_56: 0.03476965691717387
+        res_btype_mode2: 0.15430026765636246
     T-Score:
-        density_jobs: 56.11696407378302
-        nodes_high_income_hh_3000m: 3.2416338807739447
-        nodes_jobs_10km: 4.7914582910379195
-        nodes_jobs_5000m_agg3: 4.739415835644817
-        res_btype_mode3: -2.8565279245974597
-        tracts_mean_year_built: 209.52183241207376
+        density_households: -2.08907032550172
+        mean_year_built: 74.99166853817306
+        nodes_jobs_10km: 4.974564374158917
+        nodes_jobs_5000m_56: 9.69778513717838
+        res_btype_mode2: 1.7550791135885653
 
 probability_mode: single_chooser
 
 log_likelihoods:
-    convergence: -2730.7635856993556
+    convergence: -3589.4067967566184
     'null': -3912.023005428176
-    ratio: 0.301956153654963
+    ratio: 0.08246787102834197

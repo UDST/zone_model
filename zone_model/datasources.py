@@ -19,7 +19,7 @@ def hdfstore(settings):
 # Generator function for configs
 def register_config_injectable_from_yaml(injectable_name, yaml_file):
     """
-    Generator function for YAML-based config injectables.
+    Create orca function for YAML-based config injectables.
     """
     @orca.injectable(injectable_name, cache=True)
     def func():
@@ -50,7 +50,7 @@ print 'Model template is: %s. Operating on %s with %s.' % (template, geography, 
 
 def register_table_from_store(table_name):
     """
-    Generator function for tables from data store.
+    Create orca function for tables from data store.
     """
     if (table_name == geography) & (geography != 'zone'):
         @orca.table('zones', cache=True)
@@ -62,30 +62,9 @@ def register_table_from_store(table_name):
             return store[table_name]
     return func
 
-def register_aggregation_table(table_name, table_id):
-    """
-    Generator function for tables representing aggregate geography.
-    """
-    @orca.table(table_name, cache=True)
-    def func():
-        geography_dfw = orca.get_table('zones')
-        geog_ids = geography_dfw[table_id].value_counts().index.values
-        df = pd.DataFrame(index=geog_ids)
-        df.index.name = table_id
-        return df
-    return func
-
 # Tables from data-store
-for table in [geography, 'nodes', 'jobs', 'households', 'persons', 'residential_units', 'edges', 'region']:
+for table in [geography, 'jobs', 'households', 'persons', 'residential_units', 'nodes', 'edges', 'region']:
     register_table_from_store(table)
-
-# Aggregate-geography tables
-aggregate_geos = [('pumas', 'puma10_id'), 
-                  ('tracts', 'tract_id'), 
-                  ('block_groups', 'block_group_id'), 
-                  ('counties', 'county_id')]
-for geog in aggregate_geos:
-    register_aggregation_table(geog[0], geog[1])
 
 # Other
 @orca.injectable('year')
@@ -171,15 +150,7 @@ orca.add_injectable('number_of_pods', number_of_pods)
 # Settings
 settings = orca.get_injectable('settings')
 
-# Whether or not to parallelize the model pods
-multiprocess = settings['multiprocess']
-orca.add_injectable("multiprocess", multiprocess)
-if multiprocess:
-    import redis
-    r = redis.Redis(host='localhost', port=6379)
-    orca.add_injectable('redis_conn', r)
-
-# this specifies the relationships between tables
+# Table relationships
 orca.broadcast(geography, 'households', cast_index=True, onto_on=geography_id)
 orca.broadcast(geography, 'jobs', cast_index=True, onto_on=geography_id)
 orca.broadcast('nodes', geography, cast_index=True, onto_on='node_id')

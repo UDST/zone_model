@@ -12,7 +12,7 @@ alts_predict_filters: null
 
 interaction_predict_filters: null
 
-choice_column: block_id
+choice_column: zone_id
 
 sample_size: 50
 
@@ -21,12 +21,11 @@ estimation_sample_size: 1000
 prediction_sample_size: null
 
 model_expression: !!set
-    block_groups_median_year_built: null
-    counties_median_income: null
     density_households: null
-    nodes_ave_rent_400m: null
-    nodes_jobs_15km: null
+    nodes_post2000_du_800m: null
     res_btype_mode1: null
+    res_rent: null
+    total_jobs: null
 
 fitted: true
 
@@ -34,30 +33,27 @@ choice_mode: aggregate
 
 fit_parameters:
     Coefficient:
-        block_groups_median_year_built: 0.06398717750632346
-        counties_median_income: 9.803995189052718e-06
-        density_households: 0.09977464318484061
-        nodes_ave_rent_400m: 0.4089522093398425
-        nodes_jobs_15km: 0.09346794177434799
-        res_btype_mode1: 2.4957498250913486
+        density_households: -0.09873142630855873
+        nodes_post2000_du_800m: 1.0655402309969928
+        res_btype_mode1: 1.4087392693936809
+        res_rent: 0.00026727201475533285
+        total_jobs: -0.00013425861775710255
     Std. Error:
-        block_groups_median_year_built: 0.0003723606162519727
-        counties_median_income: 5.0567752583198e-06
-        density_households: 0.01690944816004821
-        nodes_ave_rent_400m: 0.13200312810131629
-        nodes_jobs_15km: 0.025578648699885152
-        res_btype_mode1: 0.14026916057506206
+        density_households: 0.020400171341399514
+        nodes_post2000_du_800m: 0.028491023904661916
+        res_btype_mode1: 0.144044269911046
+        res_rent: 0.00011014427241007834
+        total_jobs: 4.43920569689079e-05
     T-Score:
-        block_groups_median_year_built: 171.84195834240424
-        counties_median_income: 1.9387840448163922
-        density_households: 5.90052627622569
-        nodes_ave_rent_400m: 3.098049381268902
-        nodes_jobs_15km: 3.6541391560988776
-        res_btype_mode1: 17.79257689188067
+        density_households: -4.839735150076708
+        nodes_post2000_du_800m: 37.3991554168975
+        res_btype_mode1: 9.779904957438728
+        res_rent: 2.4265629878624275
+        total_jobs: -3.024383795757358
 
 probability_mode: single_chooser
 
 log_likelihoods:
-    convergence: -3058.286648843428
+    convergence: -2892.0832792753104
     'null': -3912.023005428176
-    ratio: 0.2182339815998361
+    ratio: 0.26071925567350596

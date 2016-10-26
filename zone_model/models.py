@@ -31,19 +31,10 @@ def generate_indicators():
 
 
 @orca.step('build_networks')
-def build_networks(store, zones, households):
+def build_networks(store, zones):
     if 'net' not in orca.list_injectables():
-        if 'process_has_pandana' not in orca.list_injectables():
-            initialize_pandana(store, zones, households)
-        else:
-            if orca.get_injectable('process_has_pandana'):
-                initialize_pandana(store, zones, households)
-
-
-def initialize_pandana(store, zones, households):
-    nodes, edges = store.nodes, store.edges
-    
-    if (len(households) < 800000) & (len(edges) < 140000):
+        nodes, edges = store.nodes, store.edges
+        
         print 'Number of nodes is %s.' % len(nodes)
         print 'Number of edges is %s.' % len(edges)
         net = pdna.Network(nodes["x"], nodes["y"], edges["from"], edges["to"],
@@ -52,71 +43,13 @@ def initialize_pandana(store, zones, households):
         precompute_distance = 40000
         print 'Precomputing network for distance %s.' % precompute_distance
 
-    else:
-        pdna.network.reserve_num_graphs(2)
-        print 'Number of nodes is %s.' % len(nodes)
-        print 'Number of edges is %s.' % len(edges)
-
-        # Dead-end nodes
-        node_ids_from_edges = np.concatenate([edges["from"], edges["to"]])
-        nodes_by_edge_count = pd.Series(node_ids_from_edges).value_counts()
-        dead_end_nodes = nodes_by_edge_count[nodes_by_edge_count==1].index.values
-        print 'Removing %s dead-end nodes' % len(dead_end_nodes)
-        def remove_nodes(nodes, edges, node_ids):
-            rm_nodes = set(node_ids)
-            nodes_to_keep = ~nodes.index.isin(rm_nodes)
-            edges_to_keep = ~(edges['from'].isin(rm_nodes) | edges['to'].isin(rm_nodes))# 
-            nodes = nodes.loc[nodes_to_keep]
-            edges = edges.loc[edges_to_keep]
-            return nodes, edges
-        nodes, edges = remove_nodes(nodes, edges, dead_end_nodes)
-
-        # Remove by type
-        if len(households) > 1000000:
-            edge_type_to_keep = ['secondary', 'primary','motorway_link', 'motorway',
-                                 'secondary_link', 'primary_link', 'tertiary_link', 'trunk',
-                                'trunk_link']
-            idx_edges_to_exclude = ~edges['edge_type'].isin(edge_type_to_keep)
-        else:
-            edge_type_to_exclude = ['service', 'living_street', 'living_street', 'tertiary',]  #unclassified, living_street', 'tertiary',
-            idx_edges_to_exclude = edges['edge_type'].isin(edge_type_to_exclude)
-        edges_subset = edges[idx_edges_to_exclude]
-        edges_rest = edges[~idx_edges_to_exclude]
-        from_nodes = edges_subset['from'].values
-        to_nodes = edges_subset['to'].values
-        impacted_nodes = pd.Series(np.unique(np.concatenate([from_nodes, to_nodes])))
-        impacted_nodes = impacted_nodes[~impacted_nodes.isin(edges_rest['from'])]
-        impacted_nodes = impacted_nodes[~impacted_nodes.isin(edges_rest['to'])]
-        nodes_rest = nodes[~np.in1d(nodes.index.values, impacted_nodes)]
-        nodes = nodes_rest
-        edges = edges_rest
-        print 'Removed %s nodes and %s edges based on edge type rules' % (len(impacted_nodes), len(edges_subset))
-
-        # Low-connectivity nodes
-        net = pdna.Network(nodes["x"], nodes["y"], edges["from"], edges["to"],
-                           edges[["weight"]])
-        lcn = net.low_connectivity_nodes(10000, 15, imp_name='weight')
-        rm_nodes = set(lcn)
-        print 'Removing %s low-connectivity nodes' % len(rm_nodes)
-        nodes_to_keep = ~nodes.index.isin(rm_nodes)
-        edges_to_keep = ~(edges['from'].isin(rm_nodes) | edges['to'].isin(rm_nodes))
-        nodes = nodes.loc[nodes_to_keep]
-        edges = edges.loc[edges_to_keep]
-
-        print 'Number of nodes is %s.' % len(nodes)
-        print 'Number of edges is %s.' % len(edges)
-
-        net = pdna.Network(nodes["x"], nodes["y"], edges["from"], edges["to"],
-                           edges[["weight"]])
-        precompute_distance = 40000
-
-    orca.add_injectable("net", net)
-    print 'Network precompute starting.'
-    net.precompute(precompute_distance)
-    print 'Network precompute done.'
-    b = zones.to_frame(zones.local_columns)
-    b['node_id'] = net.get_node_ids(b['x'], b['y'])
-    orca.add_table("zones", b)
+        orca.add_injectable("net", net)
+        print 'Network precompute starting.'
+        net.precompute(precompute_distance)
+        print 'Network precompute done.'
+        b = zones.to_frame(zones.local_columns)
+        b['node_id'] = net.get_node_ids(b['x'], b['y'])
+        orca.add_table("zones", b)
         
 
 @orca.step('households_transition_basic')

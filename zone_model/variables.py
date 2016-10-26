@@ -40,10 +40,6 @@ def ln_residential(zones):
 def z_id(zones):
     return zones.index
 
-@orca.column('zones', 'acres', cache=True)
-def acres(zones):
-    return zones.square_meters_land/4046.86
-
 
 #####################
 # HOUSEHOLD VARIABLES
@@ -92,22 +88,6 @@ def with_car(households):
 @orca.column('households', 'node_id', cache=True, cache_scope='iteration')
 def node_id(households, zones):
     return misc.reindex(zones.node_id, households[geography_base_id])
-    
-@orca.column('households', 'tract_id', cache=True, cache_scope='iteration')
-def tract_id(households, zones):
-    return misc.reindex(zones.tract_id, households[geography_base_id])
-    
-@orca.column('households', 'block_group_id', cache=True, cache_scope='iteration')
-def block_group_id(households, zones):
-    return misc.reindex(zones.block_group_id, households[geography_base_id])
-    
-@orca.column('households', 'puma10_id', cache=True, cache_scope='iteration')
-def puma10_id(households, zones):
-    return misc.reindex(zones.puma10_id, households[geography_base_id])
-
-@orca.column('households', 'county_id', cache=True, cache_scope='iteration')
-def county_id(households, zones):
-    return misc.reindex(zones.county_id, households[geography_base_id]).fillna(0)
 
 @orca.column('households', 'x', cache=True, cache_scope='iteration')
 def x(households, zones):
@@ -135,22 +115,6 @@ def aggr_sector_id(jobs):
 @orca.column('jobs', 'node_id', cache=True, cache_scope='iteration')
 def node_id(jobs, zones):
     return misc.reindex(zones.node_id, jobs[geography_base_id]).fillna(0)
-
-@orca.column('jobs', 'block_group_id', cache=True, cache_scope='iteration')
-def block_group_id(jobs, zones):
-    return misc.reindex(zones.block_group_id, jobs[geography_base_id]).fillna(0)
-    
-@orca.column('jobs', 'tract_id', cache=True, cache_scope='iteration')
-def tract_id(jobs, zones):
-    return misc.reindex(zones.tract_id, jobs[geography_base_id]).fillna(0)
-    
-@orca.column('jobs', 'puma10_id', cache=True, cache_scope='iteration')
-def puma10_id(jobs, zones):
-    return misc.reindex(zones.puma10_id, jobs[geography_base_id]).fillna(0)
-
-@orca.column('jobs', 'county_id', cache=True, cache_scope='iteration')
-def county_id(jobs, zones):
-    return misc.reindex(zones.county_id, jobs[geography_base_id]).fillna(0)
 
 @orca.column('jobs', 'x', cache=True, cache_scope='iteration')
 def x(jobs, zones):
@@ -247,91 +211,14 @@ def vacant_du_spaces(zones, residential_units):
 def vacant_residential_units(zones, households):
     return zones.residential_units.sub(
         households[geography_base_id].value_counts(), fill_value=0)
-
-
-#####################
-#     PUMA
-#####################
-@orca.column('pumas', 'residential_units', cache=True, cache_scope='iteration')
-def residential_units(zones):
-    return zones.residential_units.groupby(zones.puma10_id).sum()
-
-@orca.column('pumas', 'households', cache=True, cache_scope='iteration')
-def households(households):
-    return households.serialno.groupby(households.puma10_id).size()
-    
-@orca.column('pumas', 'vacant_residential_units', cache=True, cache_scope='iteration')
-def vacant_residential_units(pumas):
-    return pumas.residential_units - pumas.households
-
-@orca.column('pumas', 'residential_vacancy', cache=True, cache_scope='iteration')
-def residential_vacancy(pumas):
-    return pumas.households*1.0/pumas.residential_units
-
-@orca.column('pumas', 'jobs', cache=True, cache_scope='iteration')
-def jobs(jobs):
-    return jobs.sector_id.groupby(jobs.puma10_id).size()
-
-@orca.column('pumas', 'job_household_ratio', cache=True, cache_scope='iteration')
-def job_household_ratio(pumas):
-    return pumas.jobs*1.0/pumas.households
-    
     
 #######################
 #     RESIDENTIAL UNITS
 #######################
-    
-@orca.column('residential_units', 'rent', cache=True, cache_scope='iteration')
-def rent(residential_units, zones):
-
-    zones = zones.to_frame(columns=['res_rents', 'tract_id', 'puma10_id'])
-
-    tract_vals = pd.DataFrame(index=np.unique(zones.tract_id), data=zones[zones.res_rents > 0].groupby('tract_id').res_rents.median()).fillna(0)
-    puma_vals = pd.DataFrame(index=np.unique(zones.puma10_id), data=zones[zones.res_rents > 0].groupby('puma10_id').res_rents.median()).fillna(0)
-
-    zones['tract_vals'] = misc.reindex(tract_vals.res_rents, zones.tract_id)
-    zones['puma_vals'] = misc.reindex(puma_vals.res_rents, zones.puma10_id)
-
-    zones.res_rents[zones.res_rents == 0] = zones.tract_vals[zones.res_rents == 0]
-    zones.res_rents[zones.res_rents == 0] = zones.puma_vals[zones.res_rents == 0]
-
-    return misc.reindex(zones.res_rents, residential_units[geography_base_id])
-    
-@orca.column('residential_units', 'value', cache=True, cache_scope='iteration')
-def value(residential_units, zones):
-
-    zones = zones.to_frame(columns=['res_values', 'tract_id', 'puma10_id'])
-
-    tract_vals = pd.DataFrame(index=np.unique(zones.tract_id), data=zones[zones.res_values > 0].groupby('tract_id').res_values.median()).fillna(0)
-    puma_vals = pd.DataFrame(index=np.unique(zones.puma10_id), data=zones[zones.res_values > 0].groupby('puma10_id').res_values.median()).fillna(0)
-
-    zones['tract_vals'] = misc.reindex(tract_vals.res_values, zones.tract_id)
-    zones['puma_vals'] = misc.reindex(puma_vals.res_values, zones.puma10_id)
-
-    zones.res_values[zones.res_values == 0] = zones.tract_vals[zones.res_values == 0]
-    zones.res_values[zones.res_values == 0] = zones.puma_vals[zones.res_values == 0]
-
-    return misc.reindex(zones.res_values, residential_units[geography_base_id])
 
 @orca.column('residential_units', 'node_id', cache=True, cache_scope='iteration')
 def node_id(residential_units, zones):
     return misc.reindex(zones.node_id, residential_units[geography_base_id]).fillna(0)
-
-@orca.column('residential_units', 'block_group_id', cache=True, cache_scope='iteration')
-def block_group_id(residential_units, zones):
-    return misc.reindex(zones.block_group_id, residential_units[geography_base_id]).fillna(0)
-
-@orca.column('residential_units', 'tract_id', cache=True, cache_scope='iteration')
-def tract_id(residential_units, zones):
-    return misc.reindex(zones.tract_id, residential_units[geography_base_id]).fillna(0)
-
-@orca.column('residential_units', 'puma10_id', cache=True, cache_scope='iteration')
-def puma10_id(residential_units, zones):
-    return misc.reindex(zones.puma10_id, residential_units[geography_base_id]).fillna(0)
-
-@orca.column('residential_units', 'county_id', cache=True, cache_scope='iteration')
-def county_id(residential_units, zones):
-    return misc.reindex(zones.county_id, residential_units[geography_base_id]).fillna(0)
 
 @orca.column('residential_units', 'x', cache=True, cache_scope='iteration')
 def x(residential_units, zones):
@@ -427,27 +314,6 @@ def make_disagg_var(from_geog_name, to_geog_name, var_to_disaggregate, from_geog
 
     return func
 
-def node_disagg_var(from_geog_name, to_geog_name, var_to_disaggregate, from_geog_id_name, name_based_on_geography=True):
-    """
-    Generator function for distributed accessibility variables. Registers with orca.
-    """
-    r = orca.get_injectable('redis_conn')
-    if name_based_on_geography:
-        var_name = from_geog_name + '_' + var_to_disaggregate
-    else:
-        var_name = var_to_disaggregate
-    @orca.column(to_geog_name, var_name, cache=True, cache_scope='iteration')
-    def func():
-        print 'Loading %s from distributed cache.  Waiting for results to be ready' % var_name
-        while True:
-            time.sleep(.1)
-            result = r.get(var_name)
-            if (result != 'Not calculated') & (result is not None):
-                print 'Ready!'
-                series = pd.read_msgpack(result)
-                break
-        return series
-    return func
 
 def make_size_var(agent, geog, geog_id):
     """
@@ -539,16 +405,12 @@ def make_density_var(agent, geog):
 
 aggregation_functions = ['mean', 'median', 'std', 'sum']
 
-geographic_levels = [('block_groups', 'block_group_id'),
-                     ('tracts', 'tract_id'),
-                     ('pumas', 'puma10_id'),
-                     ('counties', 'county_id'),
-                     ('zones', geography_base_id)]
+geographic_levels = [('zones', geography_base_id)]
 
 variables_to_aggregate = {'households':['persons', 'cars', 'income', 'race_of_head', 'age_of_head',
                                         'workers', 'children', 'tenure', 'recent_mover'],
                           'jobs':['sector_id'],
-                          'residential_units':['year_built', 'building_type_id', 'rent', 'value'],
+                          'residential_units':['year_built', 'building_type_id'],
                           'zones':['x','y','own_multifam_post2010','own_singlfam_post2010',
                                     'rnt_multifam_post2010','rnt_singlfam_post2010', 'acres']
                           }
@@ -557,8 +419,6 @@ discrete_variables = {'households':['persons', 'cars', 'race_of_head', 'workers'
                           'residential_units':['year_built', 'building_type_id'],
                           }
 sum_vars = ['persons', 'cars', 'workers', 'children', 'recent_mover', 'acres']
-
-geog_vars_to_dummify = ['puma10_id', 'county_id']
 
 # Aggregation vars
 generated_variables = set([])
@@ -630,26 +490,9 @@ for geography in geographic_levels:
     geography_id = geography[1]
     if geography_name != 'zones':
         for var in generated_variables:
-            # print '  ' + var
             make_disagg_var(geography_name, 'zones', var, geography_id)
 
 # Disaggregate node vars
 for var in orca.get_table('nodes').columns:
     if var not in ['x', 'y']:
-        if orca.get_injectable('multiprocess'):
-            if not orca.get_injectable('process_has_pandana'):
-                node_disagg_var('nodes', 'zones', var, 'node_id')
-            else:
-                make_disagg_var('nodes', 'zones', var, 'node_id')
-        else:
-            make_disagg_var('nodes', 'zones', var, 'node_id')
-
-# Define geographic dummies
-for geog_var in geog_vars_to_dummify:
-    # print geog_var
-    geog_ids = np.unique(orca.get_table('zones')[geog_var]) # works for counties too
-    for geog_id in geog_ids:
-        # print geog_id
-        make_dummy_variable(geog_var, geog_id)
-# TODO: Create ln version of these variable definitions..
-
+        make_disagg_var('nodes', 'zones', var, 'node_id')

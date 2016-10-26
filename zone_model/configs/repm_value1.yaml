@@ -3,17 +3,16 @@ name: RegressionModel
 model_type: regression
 
 fit_filters:
-- res_values > 0
-- value_impute==0
+- res_value > 0
 
 predict_filters: all_zones == 1
 
 model_expression:
-    left_side: res_values
+    left_side: res_value
     right_side: !!set
-        block_groups_mean_income: null
-        block_groups_mean_year_built: null
-        density_households: null
+        median_year_built: null
+        nodes_ave_income_5000m: null
+        nodes_jobs_5000m_71: null
         res_btype_mode1: null
 
 ytransform: null
@@ -22,24 +21,24 @@ fitted: true
 
 fit_parameters:
     Coefficient:
-        Intercept: -657767.6683290352
-        block_groups_mean_income: 1.5325288336191631
-        block_groups_mean_year_built: 370.4448090061999
-        density_households: -3512.753267414993
-        res_btype_mode1: -65.9088203105648
+        Intercept: -1649586.5946264137
+        median_year_built: 354.32591495203764
+        nodes_ave_income_5000m: 100931.12215449759
+        nodes_jobs_5000m_71: 6235.703029866779
+        res_btype_mode1: 38998.67784202022
     Std. Error:
-        Intercept: 74937.263649951
-        block_groups_mean_income: 0.028328954181375328
-        block_groups_mean_year_built: 38.35567833275323
-        density_households: 228.82300409240258
-        res_btype_mode1: 1066.812704623822
+        Intercept: 191138.9149179606
+        median_year_built: 100.79012144812697
+        nodes_ave_income_5000m: 6023.095332004136
+        nodes_jobs_5000m_71: 1258.5700813032922
+        res_btype_mode1: 5232.466297303495
     T-Score:
-        Intercept: -8.777577887039184
-        block_groups_mean_income: 54.097614186785385
-        block_groups_mean_year_built: 9.65814776608616
-        density_households: -15.35139913641062
-        res_btype_mode1: -0.061781060560021625
+        Intercept: -8.630302182757701
+        median_year_built: 3.5154825677474393
+        nodes_ave_income_5000m: 16.75735092854882
+        nodes_jobs_5000m_71: 4.954593409220006
+        res_btype_mode1: 7.453211473548877
 
-fit_rsquared_adj: 0.48431650677402693
+fit_rsquared_adj: 0.2043541237046077
 
-fit_rsquared: 0.48460106105363854
+fit_rsquared: 0.20598371075283184

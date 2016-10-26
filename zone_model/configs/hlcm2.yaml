@@ -12,7 +12,7 @@ alts_predict_filters: null
 
 interaction_predict_filters: null
 
-choice_column: block_id
+choice_column: zone_id
 
 sample_size: 50
 
@@ -21,14 +21,13 @@ estimation_sample_size: 1000
 prediction_sample_size: null
 
 model_expression: !!set
-    counties_total_households: null
-    density_households: null
-    mean_value: null
-    nodes_jobs_15km: null
+    density_jobs: null
+    nodes_high_income_hh_1500m: null
+    nodes_jobs_40km: null
     nodes_post2000_du_800m: null
-    pumas_median_income: null
     ratio_households_to_residential_units: null
     res_btype_mode4: null
+    res_value: null
 
 fitted: true
 
@@ -36,36 +35,33 @@ choice_mode: aggregate
 
 fit_parameters:
     Coefficient:
-        counties_total_households: 3.9707548449211025e-05
-        density_households: 0.1122668760457983
-        mean_value: -3.7629904007223337e-06
-        nodes_jobs_15km: 0.20192187543290008
-        nodes_post2000_du_800m: 0.34249508995044614
-        pumas_median_income: 0.00019238815211585782
-        ratio_households_to_residential_units: 3.0
-        res_btype_mode4: 1.307742982272822
+        density_jobs: -0.006875637879894528
+        nodes_high_income_hh_1500m: 0.3395597405139377
+        nodes_jobs_40km: 0.28319402538810523
+        nodes_post2000_du_800m: 0.1162622069483979
+        ratio_households_to_residential_units: 1.3349295256751403
+        res_btype_mode4: 1.0779845715400844
+        res_value: -5.057898484919803e-06
     Std. Error:
-        counties_total_households: 2.2653588820689113e-06
-        density_households: 0.007066858965436177
-        mean_value: 8.354700510039236e-07
-        nodes_jobs_15km: 0.027174292853848526
-        nodes_post2000_du_800m: 0.027213659554368115
-        pumas_median_income: 6.047326913063222e-06
-        ratio_households_to_residential_units: 0.36635781115363103
-        res_btype_mode4: 0.08370883830668992
+        density_jobs: 0.0023965124459186917
+        nodes_high_income_hh_1500m: 0.04216828045902849
+        nodes_jobs_40km: 0.036664617988240715
+        nodes_post2000_du_800m: 0.021059749817832797
+        ratio_households_to_residential_units: 0.5305335141921703
+        res_btype_mode4: 0.07514509185913511
+        res_value: 5.102719257243147e-07
     T-Score:
-        counties_total_households: 17.528149187976272
-        density_households: 15.886389780083721
-        mean_value: -4.504039847030569
-        nodes_jobs_15km: 7.430621157978105
-        nodes_post2000_du_800m: 12.585410986942094
-        pumas_median_income: 31.81375091534538
-        ratio_households_to_residential_units: 8.188715809151832
-        res_btype_mode4: 15.622519780785305
+        density_jobs: -2.869018223378675
+        nodes_high_income_hh_1500m: 8.052491987285572
+        nodes_jobs_40km: 7.723904977789018
+        nodes_post2000_du_800m: 5.520588228923326
+        ratio_households_to_residential_units: 2.5162020682290036
+        res_btype_mode4: 14.34537565754586
+        res_value: -9.912162966324821
 
 probability_mode: single_chooser
 
 log_likelihoods:
-    convergence: -2603.850193679852
+    convergence: -3606.959152909316
     'null': -3912.023005428176
-    ratio: 0.33439803649752375
+    ratio: 0.07798109880631199

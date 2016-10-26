@@ -12,7 +12,7 @@ alts_predict_filters: null
 
 interaction_predict_filters: null
 
-choice_column: block_id
+choice_column: zone_id
 
 sample_size: 50
 
@@ -21,13 +21,11 @@ estimation_sample_size: 1000
 prediction_sample_size: null
 
 model_expression: !!set
-    block_groups_total_residential_units: null
-    counties_median_income: null
-    nodes_ave_rent_400m: null
-    nodes_jobs_15km: null
-    nodes_post2000_du_800m: null
+    median_year_built: null
+    nodes_jobs_10km: null
     res_btype_mode4: null
-    tracts_density_households: null
+    res_rent: null
+    total_households: null
 
 fitted: true
 
@@ -35,33 +33,27 @@ choice_mode: aggregate
 
 fit_parameters:
     Coefficient:
-        block_groups_total_residential_units: -0.00032632916246186686
-        counties_median_income: 1.5227946763170729e-05
-        nodes_ave_rent_400m: 0.23406558120944984
-        nodes_jobs_15km: 0.2977890009556021
-        nodes_post2000_du_800m: 1.241398842327875
-        res_btype_mode4: 2.3177013306588656
-        tracts_density_households: -0.5364063818951631
+        median_year_built: 0.029156683785401427
+        nodes_jobs_10km: 0.2090669037861001
+        res_btype_mode4: 1.2580590340554256
+        res_rent: 0.00013580725570800658
+        total_households: 0.0011075562438943724
     Std. Error:
-        block_groups_total_residential_units: 0.00011868299467636238
-        counties_median_income: 7.2373900330384884e-06
-        nodes_ave_rent_400m: 0.10614605833746082
-        nodes_jobs_15km: 0.04744316426889529
-        nodes_post2000_du_800m: 0.0450901657172533
-        res_btype_mode4: 0.08255443830266934
-        tracts_density_households: 0.08884158338452176
+        median_year_built: 0.00015154260836938913
+        nodes_jobs_10km: 0.02642133530063322
+        res_btype_mode4: 0.07608457932722684
+        res_rent: 0.00011502547833803759
+        total_households: 7.231420781892641e-05
     T-Score:
-        block_groups_total_residential_units: -2.7495865212344572
-        counties_median_income: 2.104066064376186
-        nodes_ave_rent_400m: 2.2051273959255813
-        nodes_jobs_15km: 6.276752521560597
-        nodes_post2000_du_800m: 27.53147659984905
-        res_btype_mode4: 28.074824059264714
-        tracts_density_households: -6.03778502656243
+        median_year_built: 192.39924730826354
+        nodes_jobs_10km: 7.912806124567426
+        res_btype_mode4: 16.535006767202162
+        res_rent: 1.1806710797489177
+        total_households: 15.315887116784504
 
 probability_mode: single_chooser
 
 log_likelihoods:
-    convergence: -1931.4948135233494
+    convergence: -3389.1925226370804
     'null': -3912.023005428176
-    ratio: 0.5062670104845294
+    ratio: 0.13364708798124036

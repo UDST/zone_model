@@ -3,20 +3,17 @@ name: RegressionModel
 model_type: regression
 
 fit_filters:
-- res_rents > 0
-- rent_impute==0
+- res_rent > 0
 
 predict_filters: all_zones == 1
 
 model_expression:
-    left_side: res_rents
+    left_side: res_rent
     right_side: !!set
-        block_groups_density_jobs: null
-        counties_median_income: null
-        nodes_ave_year_built_5000m: null
-        nodes_jobs_35km: null
-        pumas_ratio_households_to_residential_units: null
-        res_btype_mode4: null
+        mean_year_built: null
+        nodes_ave_income_5000m: null
+        nodes_households_35km: null
+        res_btype_mode1: null
 
 ytransform: null
 
@@ -24,30 +21,24 @@ fitted: true
 
 fit_parameters:
     Coefficient:
-        Intercept: -15655.660291199516
-        block_groups_density_jobs: -5.637623291191394
-        counties_median_income: 0.009389397375496478
-        nodes_ave_year_built_5000m: 6.2502475568711
-        nodes_jobs_35km: 57.03337925292596
-        pumas_ratio_households_to_residential_units: 3165.351972552039
-        res_btype_mode4: -37.5013713476005
+        Intercept: -12453.531909493897
+        mean_year_built: 5.582634759333495
+        nodes_ave_income_5000m: 171.49108704525003
+        nodes_households_35km: 31.038163724936467
+        res_btype_mode1: 113.94750395351386
     Std. Error:
-        Intercept: 607.2355734244205
-        block_groups_density_jobs: 0.8425621645589915
-        counties_median_income: 0.00038743065818440804
-        nodes_ave_year_built_5000m: 0.3154020073904735
-        nodes_jobs_35km: 2.1698987469294027
-        pumas_ratio_households_to_residential_units: 194.4057789505533
-        res_btype_mode4: 7.023399411461744
+        Intercept: 833.6562545225289
+        mean_year_built: 0.4229306395437581
+        nodes_ave_income_5000m: 18.312392293563448
+        nodes_households_35km: 7.115914102122139
+        res_btype_mode1: 15.259274674062512
     T-Score:
-        Intercept: -25.781856294932787
-        block_groups_density_jobs: -6.691047293990708
-        counties_median_income: 24.23503968296526
-        nodes_ave_year_built_5000m: 19.816765304011454
-        nodes_jobs_35km: 26.283889667033176
-        pumas_ratio_households_to_residential_units: 16.282190733420222
-        res_btype_mode4: -5.3394900603831
+        Intercept: -14.93844956111626
+        mean_year_built: 13.19988252767838
+        nodes_ave_income_5000m: 9.364756078621511
+        nodes_households_35km: 4.36179572708447
+        res_btype_mode1: 7.4674259679721295
 
-fit_rsquared_adj: 0.41261756968553986
+fit_rsquared_adj: 0.20886486740994548
 
-fit_rsquared: 0.4131037463418906
+fit_rsquared: 0.210485215863791
