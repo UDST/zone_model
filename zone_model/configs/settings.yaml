@@ -1,6 +1,1 @@
-store: zone_model_data.h5
-
-aggregation_tables:
-  - nodes
-
-multiprocess: False
+store: model_data.h5

@@ -4,6 +4,8 @@ geography: zones
 
 geography_id: zone_id
 
+base_year: 2010
+
 models: 
 
     elcm:
@@ -12,7 +14,7 @@ models:
         alternatives_id_name: zone_id
         alternatives_name: zones
         choosers_fit_filter: null
-        segmentation_variable: aggr_sector_id
+        segmentation_variable: sector_id
 
     hlcm: 
         model_type: location_choice
@@ -27,37 +29,9 @@ models:
         agents_name: residential_units
         alternatives_id_name: zone_id
         alternatives_name: zones
-        choosers_fit_filter: year_built > 2000
-        segmentation_variable: building_type_id
 
-    repm_rent:
-        model_type: regression
-        observations_name: zones
-        dep_var: res_rent
-        fit_filters: [res_rent > 0]
-        segmentation_variable: all_zones
-        var_filter_terms: [value, rent]
-
-    repm_value:
-        model_type: regression
-        observations_name: zones
-        dep_var: res_value
-        fit_filters: [res_value > 0]
-        segmentation_variable: all_zones
-        var_filter_terms: [value, rent]
-
-model_order:
-    - elcm
-    - hlcm
-    - rdplcm
-    - repm_rent
-    - repm_value
-
-supporting_steps:
-    elcm: [jobs_transition_basic]
-    hlcm: [households_transition_basic]
-    rdplcm: [residential_unit_transition_basic]
-    repm_rent: []
-    repm_value: []
-    pre_processing: [build_networks]
-    post_processing: []
+    nrdplcm: 
+        model_type: location_choice
+        agents_name: residential_units
+        alternatives_id_name: zone_id
+        alternatives_name: zones

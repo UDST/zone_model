@@ -81,14 +81,6 @@ def old(households):
 def with_child(households):
     return (households.children>0).astype('int32')
 
-@orca.column('households', 'with_car', cache=True)
-def with_car(households):
-    return (households.cars>0).astype('int32')
-    
-@orca.column('households', 'node_id', cache=True, cache_scope='iteration')
-def node_id(households, zones):
-    return misc.reindex(zones.node_id, households[geography_base_id])
-
 @orca.column('households', 'x', cache=True, cache_scope='iteration')
 def x(households, zones):
     return misc.reindex(zones.x, households[geography_base_id]).fillna(0)
@@ -100,21 +92,6 @@ def y(households, zones):
 #####################
 # JOB VARIABLES
 #####################
-
-@orca.column('jobs', 'aggr_sector_id', cache=True)
-def aggr_sector_id(jobs):
-    jobs = jobs.to_frame(columns=['sector_id'])
-    jobs['aggr_sector_id'] = 0 # Management, Public Administration
-    jobs.aggr_sector_id[np.in1d(jobs.sector_id, [11, 21, 22, 23, 3133])] = 1 # basic industries (agr, forestry/fishing, mining, construction, manufacturing)
-    jobs.aggr_sector_id[np.in1d(jobs.sector_id, [42, 4849])] = 2 # Transportation, Communications & Public Utilities, Warehousing
-    jobs.aggr_sector_id[np.in1d(jobs.sector_id, [4445, 72])] = 3 # Retail Trade
-    jobs.aggr_sector_id[np.in1d(jobs.sector_id, [52, 53])] = 4 # Finance, Insurance, and Real Estate
-    jobs.aggr_sector_id[np.in1d(jobs.sector_id, [51, 54, 56, 61, 62, 71, 81])] = 5 # Services
-    return jobs.aggr_sector_id
-
-@orca.column('jobs', 'node_id', cache=True, cache_scope='iteration')
-def node_id(jobs, zones):
-    return misc.reindex(zones.node_id, jobs[geography_base_id]).fillna(0)
 
 @orca.column('jobs', 'x', cache=True, cache_scope='iteration')
 def x(jobs, zones):
@@ -141,7 +118,7 @@ def zone_ids(zones):
 
 @orca.column('zones', 'job_spaces', cache=True)
 def job_spaces(zones, jobs):
-    return zones.employment_capacity  # Zoning placeholder:  job capacity
+    return np.round(zones.total_number_of_jobs*1.2)  # Zoning placeholder:  job capacity
 
 @orca.column('zones', 'vacant_job_spaces', cache=False) # The ELCM capacity variable
 def vacant_job_spaces(zones, jobs):
@@ -150,57 +127,7 @@ def vacant_job_spaces(zones, jobs):
         
 @orca.column('zones', 'du_spaces', cache=True)
 def du_spaces(zones):
-    return zones.residential_unit_capacity # The RDPLCM capacity variable
-
-@orca.column('zones', 'mode_res_building_type', cache=True, cache_scope='iteration')
-def mode_res_building_type(zones, residential_units):
-    mode_btype = residential_units.building_type_id.groupby(residential_units[geography_base_id]).agg(lambda x:x.value_counts().index[0])
-    mode_btype = pd.Series(index=zones.index, data=mode_btype).fillna(0)
-    return mode_btype
-
-@orca.column('zones', 'res_btype_mode1', cache=True, cache_scope='iteration')
-def res_btype_mode1(zones):
-    return (zones.mode_res_building_type == 1).astype('int32')
-
-@orca.column('zones', 'res_btype_mode2', cache=True, cache_scope='iteration')
-def res_btype_mode2(zones):
-    return (zones.mode_res_building_type == 2).astype('int32')
-
-@orca.column('zones', 'res_btype_mode3', cache=True, cache_scope='iteration')
-def res_btype_mode3(zones):
-    return (zones.mode_res_building_type == 3).astype('int32')
-
-@orca.column('zones', 'res_btype_mode4', cache=True, cache_scope='iteration')
-def res_btype_mode4(zones):
-    return (zones.mode_res_building_type == 4).astype('int32')
-
-@orca.column('zones', 'own_singlfam_post2010', cache=True, cache_scope='iteration')
-def own_singlfam_post2010(zones, residential_units):
-    residential_units = residential_units.to_frame(residential_units.local_columns)
-    resunits = residential_units[(residential_units.building_type_id == 1) & (residential_units.year_built > 2010)].groupby(geography_base_id).size()
-    resunits = pd.Series(index=zones.index, data=resunits).fillna(0)
-    return resunits
-
-@orca.column('zones', 'own_multifam_post2010', cache=True, cache_scope='iteration')
-def own_multifam_post2010(zones, residential_units):
-    residential_units = residential_units.to_frame(residential_units.local_columns)
-    resunits = residential_units[(residential_units.building_type_id == 2) & (residential_units.year_built > 2010)].groupby(geography_base_id).size()
-    resunits = pd.Series(index=zones.index, data=resunits).fillna(0)
-    return resunits
-
-@orca.column('zones', 'rnt_singlfam_post2010', cache=True, cache_scope='iteration')
-def rnt_singlfam_post2010(zones, residential_units):
-    residential_units = residential_units.to_frame(residential_units.local_columns)
-    resunits = residential_units[(residential_units.building_type_id == 3) & (residential_units.year_built > 2010)].groupby(geography_base_id).size()
-    resunits = pd.Series(index=zones.index, data=resunits).fillna(0)
-    return resunits
-
-@orca.column('zones', 'rnt_multifam_post2010', cache=True, cache_scope='iteration')
-def rnt_multifam_post2010(zones, residential_units):
-    residential_units = residential_units.to_frame(residential_units.local_columns)
-    resunits = residential_units[(residential_units.building_type_id == 4) & (residential_units.year_built > 2010)].groupby(geography_base_id).size()
-    resunits = pd.Series(index=zones.index, data=resunits).fillna(0)
-    return resunits
+    return np.round(zones.residential_units*1.2) # The RDPLCM capacity variable
 
 @orca.column('zones', 'vacant_du_spaces', cache=False)
 def vacant_du_spaces(zones, residential_units):
@@ -216,10 +143,6 @@ def vacant_residential_units(zones, households):
 #     RESIDENTIAL UNITS
 #######################
 
-@orca.column('residential_units', 'node_id', cache=True, cache_scope='iteration')
-def node_id(residential_units, zones):
-    return misc.reindex(zones.node_id, residential_units[geography_base_id]).fillna(0)
-
 @orca.column('residential_units', 'x', cache=True, cache_scope='iteration')
 def x(residential_units, zones):
     return misc.reindex(zones.x, residential_units[geography_base_id]).fillna(0)
@@ -228,7 +151,7 @@ def x(residential_units, zones):
 def y(residential_units, zones):
     return misc.reindex(zones.y, residential_units[geography_base_id]).fillna(0)
 
-
+"""
 #####################
 # NODE VARIABLES
 #####################
@@ -242,7 +165,7 @@ for access_var in orca.get_injectable('neighborhood_vars')['variable_definitions
                                log = True if 'apply' in access_var.keys() else False,
                                target_variable = access_var.get('varname', False),
                                filters = access_var.get('filters', False))
-
+"""
 #######################
 #     AUTOGENERATED
 #######################
@@ -402,7 +325,7 @@ def make_density_var(agent, geog):
 
     return func
 
-
+"""
 aggregation_functions = ['mean', 'median', 'std', 'sum']
 
 geographic_levels = [('zones', geography_base_id)]
@@ -496,3 +419,4 @@ for geography in geographic_levels:
 for var in orca.get_table('nodes').columns:
     if var not in ['x', 'y']:
         make_disagg_var('nodes', 'zones', var, 'node_id')
+"""
