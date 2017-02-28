@@ -16,7 +16,6 @@ from urbansim.models import SegmentedMNLDiscreteChoiceModel
 import utils
 import datasources
 import variables
-import changesets
 
 geography_base_id = orca.get_injectable('geography_id')
 
@@ -389,4 +388,4 @@ def register_orca_steps_for_segmented_model(model_yaml_filenames, model_generato
     return model
 
 
-register_fitted_models()
+#register_fitted_models()
