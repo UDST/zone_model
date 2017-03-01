@@ -15,7 +15,7 @@ geography_base_id = orca.get_injectable('geography_id')
 
 @orca.column('zones', 'all_zones', cache=True)
 def all_zones(zones):
-    return pd.Series(np.ones(len(zones.residential_units)).astype('int32'), index = zones.index)
+    return pd.Series(np.ones(len(zones)).astype('int32'), index = zones.index)
 
 @orca.column('zones', 'residential_units', cache=False)
 def residential_units(zones, residential_units):
@@ -101,6 +101,10 @@ def x(jobs, zones):
 def y(jobs, zones):
     return misc.reindex(zones.y, jobs[geography_base_id]).fillna(0)
 
+@orca.column('jobs', 'all_jobs', cache=True)
+def all_jobs(jobs):
+    return pd.Series(np.ones(len(jobs.sector_id)).astype('int32'), index = jobs.index)
+
 
 #####################
 # ZONE VARIABLES 2
@@ -138,6 +142,7 @@ def vacant_du_spaces(zones, residential_units):
 def vacant_residential_units(zones, households):
     return zones.residential_units.sub(
         households[geography_base_id].value_counts(), fill_value=0)
+
     
 #######################
 #     RESIDENTIAL UNITS
@@ -150,6 +155,18 @@ def x(residential_units, zones):
 @orca.column('residential_units', 'y', cache=True, cache_scope='iteration')
 def y(residential_units, zones):
     return misc.reindex(zones.y, residential_units[geography_base_id]).fillna(0)
+
+@orca.column('residential_units', 'all_resunits', cache=True)
+def all_resunits(residential_units):
+    return pd.Series(np.ones(len(residential_units.year_built)).astype('int32'), index = residential_units.index)
+
+#######################
+#     NON-RESIDENTIAL UNITS
+#######################
+
+@orca.column('non_residential_units', 'all_nonresunits', cache=True)
+def all_nonresunits(non_residential_units):
+    return pd.Series(np.ones(len(non_residential_units)).astype('int32'), index = non_residential_units.index)
 
 """
 #####################

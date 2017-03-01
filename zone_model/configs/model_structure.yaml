@@ -35,3 +35,27 @@ models:
         agents_name: residential_units
         alternatives_id_name: zone_id
         alternatives_name: zones
+
+    repm_rent:
+        model_type: regression
+        observations_name: zones
+        dep_var: avg_residential_rent
+        fit_filters: [avg_residential_rent > 0]
+        segmentation_variable: all_zones
+        var_filter_terms: [value, rent]
+
+    repm_value:
+        model_type: regression
+        observations_name: zones
+        dep_var: avg_residential_value
+        fit_filters: [avg_residential_value > 0]
+        segmentation_variable: all_zones
+        var_filter_terms: [value, rent]
+
+    repm_nonres:
+        model_type: regression
+        observations_name: zones
+        dep_var: avg_nonres_m2_rent
+        fit_filters: [avg_nonres_m2_rent > 0]
+        segmentation_variable: all_zones
+        var_filter_terms: [value, rent]
