@@ -172,7 +172,7 @@ def rm_estimation_function(observations, dep_var, fit_filters=None, predict_filt
     return estimate_model
 
 
-def estimation_setup(alts):
+def estimation_setup(alts, alternatives_id_name="block_id"):
     # Wait for manager to provide name of estimation dataset table
     wait_for_key('estimation_dataset_type')
     estimation_dataset_type = r.get('estimation_dataset_type')
@@ -213,7 +213,6 @@ def estimation_setup(alts):
 
     # Define the estimation function
     if estimation_model_type == 'location':
-        alternatives_id_name = 'block_id'
         if choosers_fit_filter == 'None':    choosers_fit_filter = None
         model_estim_fn = lcm_estimation_function(agents_for_estimation, alts, alternatives_id_name,
                                                       choosers_fit_filter=choosers_fit_filter)
@@ -296,7 +295,7 @@ def process_spec_proposal_queue(estimate_function):
     results = process_queue_indefinitely('spec_proposal_queue', estimate_function, 'spec proposals', eval_items=True)
 
 
-def autospec_worker(redis_host, redis_port, geography='blocks', build_network=True):
+def autospec_worker(redis_host, redis_port, geography='blocks', alternatives_id_name='block_id', build_network=True):
 
     # Redis connection
     global r
@@ -335,7 +334,7 @@ def autospec_worker(redis_host, redis_port, geography='blocks', build_network=Tr
     ## Do work!
     while True:
         ##  Get agents and form the estimation function
-        estimate_model = estimation_setup(alts)
+        estimate_model = estimation_setup(alts, alternatives_id_name=alternatives_id_name)
         # Process the specification proposal queue
         process_spec_proposal_queue(estimate_model)
         time.sleep(.1)
@@ -357,11 +356,14 @@ if __name__ == '__main__':
         if args.template == 'zone':
             build_network = False
             geography = 'zones'
+            alternatives_id_name = 'zone_id'
         else:
             build_network = True
             geography = 'blocks'
+            alternatives_id_name = 'block_id'
 
-        autospec_worker(args.redis_host, args.redis_port, geography=geography, build_network=build_network)
+        autospec_worker(args.redis_host, args.redis_port, geography=geography, build_network=build_network,
+                        alternatives_id_name=alternatives_id_name)
 
     else:
         print 'Need to specify redis host and port'
