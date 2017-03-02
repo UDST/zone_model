@@ -714,7 +714,6 @@ def rm_stepwise(base_specification, variable_pool, dep_var, minimum_t_value=1.8,
     # Decision rule
     variable_pool = set(variable_pool)
     base_specification = set(base_specification)
-    import pdb; pdb.set_trace()
     if max_ts > minimum_t_value:
         variable_pool.remove(idx_max_ts)
         print 'Addings %s to specification' % idx_max_ts
@@ -1050,10 +1049,11 @@ if __name__ == '__main__':
         if template_name == 'zone':
 
             model = 'hlcm'
-            autospec_manager.autospecify_urbansim_lcm_model(fitting_strategy='recipe', model_name='hlcm1', agents_name='households', 
-                                       choosers_fit_filter='None', segmentation_variable='income_quartile', segment_id=1, 
-                                       optimization_metric='significance', constraint_config=constraint_configs[model + '_constraints.yaml'],
-                                       max_iterations=1)
+            for i in range(1,5):
+                autospec_manager.autospecify_urbansim_lcm_model(fitting_strategy='recipe', model_name='hlcm%s' % i, agents_name='households', 
+                                           choosers_fit_filter='None', segmentation_variable='income_quartile', segment_id=i, 
+                                           optimization_metric='significance', constraint_config=constraint_configs[model + '_constraints.yaml'],
+                                           max_iterations=1)
 
             model = 'elcm'
             autospec_manager.autospecify_urbansim_lcm_model(fitting_strategy='recipe', model_name='elcm1', agents_name='jobs', 
