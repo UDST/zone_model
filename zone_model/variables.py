@@ -164,6 +164,14 @@ def all_resunits(residential_units):
 #     NON-RESIDENTIAL UNITS
 #######################
 
+@orca.column('non_residential_units', 'x', cache=True, cache_scope='iteration')
+def x(non_residential_units, zones):
+    return misc.reindex(zones.x, non_residential_units[geography_base_id]).fillna(0)
+
+@orca.column('non_residential_units', 'y', cache=True, cache_scope='iteration')
+def y(rnon_residential_units, zones):
+    return misc.reindex(zones.y, non_residential_units[geography_base_id]).fillna(0)
+
 @orca.column('non_residential_units', 'all_nonresunits', cache=True)
 def all_nonresunits(non_residential_units):
     return pd.Series(np.ones(len(non_residential_units)).astype('int32'), index = non_residential_units.index)
