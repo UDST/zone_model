@@ -172,7 +172,7 @@ def rm_estimation_function(observations, dep_var, fit_filters=None, predict_filt
     return estimate_model
 
 
-def estimation_setup(alts, alternatives_id_name="block_id"):
+def estimation_setup(alts, alternatives_id_name="block_id", store=None):
     # Wait for manager to provide name of estimation dataset table
     wait_for_key('estimation_dataset_type')
     estimation_dataset_type = r.get('estimation_dataset_type')
@@ -197,7 +197,10 @@ def estimation_setup(alts, alternatives_id_name="block_id"):
             choosers_fit_filter = r.get('choosers_fit_filter')
             segmentation_variable = r.get('segmentation_variable')
             segment_id = int(r.get('segment_id'))
-            agents_for_estimation = orca.get_table(agents_name).to_frame()
+            if estimation_dataset_type == 'h5':
+                agents_for_estimation = store[agents_name]
+            else:
+                agents_for_estimation = orca.get_table(agents_name).to_frame()
             # Consider only choosers/observations in the segment
             agents_for_estimation = agents_for_estimation[agents_for_estimation[segmentation_variable] == segment_id]
         elif estimation_model_type == 'regression':
@@ -295,49 +298,58 @@ def process_spec_proposal_queue(estimate_function):
     results = process_queue_indefinitely('spec_proposal_queue', estimate_function, 'spec proposals', eval_items=True)
 
 
-def autospec_worker(redis_host, redis_port, geography='blocks', alternatives_id_name='block_id', build_network=True):
+def autospec_worker(redis_host, redis_port, geography='blocks', alternatives_id_name='block_id', build_network=True, data_path=None):
 
     # Redis connection
     global r
     r = redis.Redis(redis_host, redis_port)
-    orca.set_redis_connection(redis_host, redis_port)
 
     # Pre-processing
-    blocks = orca.get_table(geography)
-    if build_network:
-        orca.run(['build_networks'])
+    if data_path:
+        store = pd.HDFStore(data_path)
+        alts = store[geography]
 
-    # Wait for manager checkin
-    wait_for_key('manager_checkedin')
+    else:
+        store = None
 
-    # Get all columns
-    while True:
-        if r.exists('columns') == True:
-            columns = r.lrange('columns', 0, -1)
-            orca.set_redis_columns(columns)
-            break
-        time.sleep(.1)
+        orca.set_redis_connection(redis_host, redis_port)
+        blocks = orca.get_table(geography)
+        if build_network:
+            orca.run(['build_networks'])
 
-    # Process the column queue
-    def calculate_variable(column_name):
-        return blocks[column_name]
-     
-    column_results = process_queue('column_queue', calculate_variable, 'variables')
-    wait_for_key('varcalc_checkedin') # Manager confirms that all columns processed
+        # Wait for manager checkin
+        wait_for_key('manager_checkedin')
 
-    ## Form the alternatives table
-    print 'Creating the alternatives DataFrame.'
-    alternatives_dict = {}
-    for col in columns:  alternatives_dict[col] = blocks[col]
-    alts = pd.DataFrame(alternatives_dict)
+        # Get all columns
+        while True:
+            if r.exists('columns') == True:
+                columns = r.lrange('columns', 0, -1)
+                orca.set_redis_columns(columns)
+                break
+            time.sleep(.1)
+
+        # Process the column queue
+        def calculate_variable(column_name):
+            return blocks[column_name]
+         
+        column_results = process_queue('column_queue', calculate_variable, 'variables')
+        wait_for_key('varcalc_checkedin') # Manager confirms that all columns processed
+
+        ## Form the alternatives table
+        print 'Creating the alternatives DataFrame.'
+        alternatives_dict = {}
+        for col in columns:  alternatives_dict[col] = blocks[col]
+        alts = pd.DataFrame(alternatives_dict)
 
     ## Do work!
     while True:
         ##  Get agents and form the estimation function
-        estimate_model = estimation_setup(alts, alternatives_id_name=alternatives_id_name)
+        estimate_model = estimation_setup(alts, alternatives_id_name=alternatives_id_name, store=store)
         # Process the specification proposal queue
         process_spec_proposal_queue(estimate_model)
         time.sleep(.1)
+        if r.get('specification_complete') == '1':
+            break
 
 
 # dcm = model_estim_fn(['block_groups_std_sector_id'])
@@ -350,20 +362,27 @@ if __name__ == '__main__':
         parser.add_argument("-o", "--redis_host", type=str, help="redis host")
         parser.add_argument("-p", "--redis_port", type=int, help="redis port")
         parser.add_argument("-t", "--template", type=str, help="model template")
+        parser.add_argument("-d", "--data_file", help="path to .h5 data file")
 
         args = parser.parse_args()
+
+        data_path = args.data_file if args.data_file else None
 
         if args.template == 'zone':
             build_network = False
             geography = 'zones'
             alternatives_id_name = 'zone_id'
+        elif args.template == 'parcel':
+            build_network = True
+            geography = 'buildings'
+            alternatives_id_name = 'building_id'
         else:
             build_network = True
             geography = 'blocks'
             alternatives_id_name = 'block_id'
 
         autospec_worker(args.redis_host, args.redis_port, geography=geography, build_network=build_network,
-                        alternatives_id_name=alternatives_id_name)
+                        alternatives_id_name=alternatives_id_name, data_path=data_path)
 
     else:
         print 'Need to specify redis host and port'

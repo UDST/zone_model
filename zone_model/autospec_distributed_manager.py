@@ -12,7 +12,11 @@ import urbansim
 import datasources
 import variables
 import models
-import autospec_recipes
+
+try:
+    import autospec_recipes
+except:
+    pass
 
 np.random.seed(0)
 
@@ -58,7 +62,7 @@ def monitor_queue(queue_key):
             break
 
 
-def connect_to_redis(redis_host, redis_port, flush=False):
+def connect_to_redis(redis_host, redis_port, flush=False, orca_redis=False):
     """
     Establish Redis connection and optionally flush existing keys.
 
@@ -80,7 +84,10 @@ def connect_to_redis(redis_host, redis_port, flush=False):
     """
     global r
     r = redis.Redis(redis_host, redis_port)
-    orca.set_redis_connection(redis_host, redis_port)
+    
+    if orca_redis:
+        orca.set_redis_connection(redis_host, redis_port)
+
     if flush:
         r.flushall()
     return r
@@ -246,16 +253,23 @@ class AutospecManager(object):
     specification routine, and final model selection.
 
     """
-    def __init__(self, redis_host, redis_port, core_table_name='blocks', build_network=True):
+    def __init__(self, redis_host, redis_port, core_table_name='blocks', build_network=True, data_path=None):
 
         ## Redis connection
-        connect_to_redis(redis_host, redis_port, flush=True)
+        orca_redis = False if data_path else True
+        connect_to_redis(redis_host, redis_port, flush=True, orca_redis=orca_redis)
         r.set('manager_checkedin', 1)
         print 'Redis connection made.'
 
-        ## Data setup and initiate worker variable calculations
-        core_table = data_setup(core_table_name, build_network=build_network)
-        self.alts = create_alternatives_dataframe(core_table)
+        ## Data setup and initiate worker variable calculations, if applicable
+
+        if data_path:
+            self.store = pd.HDFStore(data_path)
+            self.alts = self.store[core_table_name]
+
+        else:
+            core_table = data_setup(core_table_name, build_network=build_network)
+            self.alts = create_alternatives_dataframe(core_table)
 
 
     def autospecify_urbansim_lcm_model(self, fitting_strategy='recipe', model_name='hlcm1', agents_name='households', 
@@ -313,6 +327,34 @@ class AutospecManager(object):
         define_estimation_function(estimation_dataset_type = 'url', url=url)
         specification = stepwise([], self.alts.columns, max_iterations = 10)
         set_specification_status_complete()
+
+
+    def autospecify_h5_dataset_lcm(self, choosers_table_name, model_name, choosers_fit_filter, segmentation_variable, segment_id,
+                                   fitting_strategy='stepwise_simple'):
+
+        if r.get('specification_complete') == '1':  
+            reset_specification_queue_status() # If this is not the first spec run, reset spec status
+
+        define_estimation_function(model_name=model_name, # function call parameters different if estimation dataset is url
+                                   agents_name=choosers_table_name, 
+                                   choosers_fit_filter=choosers_fit_filter, 
+                                   segmentation_variable=segmentation_variable,
+                                   segment_id=segment_id, 
+                                   estimation_dataset_type = 'h5',
+                                   estimation_model_type='location')
+
+        if fitting_strategy == 'stepwise_simple':
+            r.set('specification_started', 1)
+            specification = stepwise([], self.alts.columns, max_iterations=2, optimization_metric='significance')
+
+            # Get YAML string for final model
+            specification_check = ('yaml persist', list(specification))
+            r.rpush('spec_proposal_queue', specification_check)
+            result_key = 'yaml_' + model_name
+            wait_for_key(result_key)
+            final_model = r.get(result_key)
+            write_to_file(final_model, model_name + str(segment_id) + '.yaml')
+            set_specification_status_complete()
 
 
     def autospecify_urbansim_rm_model(self, fitting_strategy='recipe', model_name='repm1', observations_name='blocks', 
@@ -1033,99 +1075,117 @@ if __name__ == '__main__':
         parser = argparse.ArgumentParser()
         parser.add_argument("-o", "--redis_host", type=str, help="redis host")
         parser.add_argument("-p", "--redis_port", type=int, help="redis port")
+        parser.add_argument("-d", "--data_file", help="path to .h5 data file")
+        parser.add_argument("-t", "--table_name", help="core estimation table name (alts)")
+        parser.add_argument("-c", "--choosers_name", help="choosers table name")
+        parser.add_argument("-m", "--model_name", help="model name, e.g. elcm")
+        parser.add_argument("-f", "--filter", help="choosers fit filter")
+        parser.add_argument("-s", "--segmentation", help="segmentation variable name")
+        parser.add_argument("-i", "--segmentid", type=int, help="segment ID value")
         args = parser.parse_args()
 
-        #autospec_manager(args.redis_host, args.redis_port)
-        autospec_manager = AutospecManager(args.redis_host, args.redis_port, core_table_name='zones', build_network=False)
+        data_path = args.data_file if args.data_file else None
 
-        #autospec_manager.autospecify_url_dataset_lcm('http://synthpop-data2.s3-website-us-west-1.amazonaws.com/testdata/flint-lead-samples.csv')
+        if data_path:
+            autospec_manager = AutospecManager(args.redis_host, args.redis_port, 
+                                               core_table_name=args.table_name, build_network=False, data_path=data_path)
 
-        model_structure = orca.get_injectable('model_structure')
-        template_name = model_structure['template']
-        models = model_structure['models']
+            autospec_manager.autospecify_h5_dataset_lcm(args.choosers_name, args.model_name, args.filter, 
+                                                        args.segmentation, args.segmentid)
+            
+     
+        else:
+            #autospec_manager(args.redis_host, args.redis_port)
+            autospec_manager = AutospecManager(args.redis_host, args.redis_port, core_table_name='zones', build_network=False)
 
-        constraint_configs = orca.get_injectable('constraint_configs')[template_name]
+            #autospec_manager.autospecify_url_dataset_lcm('http://synthpop-data2.s3-website-us-west-1.amazonaws.com/testdata/flint-lead-samples.csv')
 
-        if template_name == 'zone':
+            model_structure = orca.get_injectable('model_structure')
+            template_name = model_structure['template']
+            models = model_structure['models']
 
-            model = 'hlcm'
-            for i in range(1,5):
-                autospec_manager.autospecify_urbansim_lcm_model(fitting_strategy='recipe', model_name='hlcm%s' % i, agents_name='households', 
-                                           choosers_fit_filter='None', segmentation_variable='income_quartile', segment_id=i, 
+            constraint_configs = orca.get_injectable('constraint_configs')[template_name]
+
+            if template_name == 'zone':
+
+                model = 'hlcm'
+                for i in range(1,5):
+                    autospec_manager.autospecify_urbansim_lcm_model(fitting_strategy='recipe', model_name='hlcm%s' % i, agents_name='households', 
+                                               choosers_fit_filter='None', segmentation_variable='income_quartile', segment_id=i, 
+                                               optimization_metric='significance', constraint_config=constraint_configs[model + '_constraints.yaml'],
+                                               max_iterations=1)
+
+                model = 'elcm'
+                autospec_manager.autospecify_urbansim_lcm_model(fitting_strategy='recipe', model_name='elcm1', agents_name='jobs', 
+                                           choosers_fit_filter='None', segmentation_variable='all_jobs', segment_id=1, 
                                            optimization_metric='significance', constraint_config=constraint_configs[model + '_constraints.yaml'],
                                            max_iterations=1)
 
-            model = 'elcm'
-            autospec_manager.autospecify_urbansim_lcm_model(fitting_strategy='recipe', model_name='elcm1', agents_name='jobs', 
-                                       choosers_fit_filter='None', segmentation_variable='all_jobs', segment_id=1, 
-                                       optimization_metric='significance', constraint_config=constraint_configs[model + '_constraints.yaml'],
-                                       max_iterations=1)
+                model = 'rdplcm'
+                autospec_manager.autospecify_urbansim_lcm_model(fitting_strategy='recipe', model_name='rdplcm1', agents_name='residential_units', 
+                                           choosers_fit_filter='None', segmentation_variable='all_resunits', segment_id=1, 
+                                           optimization_metric='significance', constraint_config=constraint_configs[model + '_constraints.yaml'],
+                                           max_iterations=1)
 
-            model = 'rdplcm'
-            autospec_manager.autospecify_urbansim_lcm_model(fitting_strategy='recipe', model_name='rdplcm1', agents_name='residential_units', 
-                                       choosers_fit_filter='None', segmentation_variable='all_resunits', segment_id=1, 
-                                       optimization_metric='significance', constraint_config=constraint_configs[model + '_constraints.yaml'],
-                                       max_iterations=1)
+                model = 'nrdplcm'
+                autospec_manager.autospecify_urbansim_lcm_model(fitting_strategy='recipe', model_name='nrdplcm1', agents_name='non_residential_units', 
+                                           choosers_fit_filter='None', segmentation_variable='all_nonresunits', segment_id=1, 
+                                           optimization_metric='significance', constraint_config=constraint_configs[model + '_constraints.yaml'],
+                                           max_iterations=1)
 
-            model = 'nrdplcm'
-            autospec_manager.autospecify_urbansim_lcm_model(fitting_strategy='recipe', model_name='nrdplcm1', agents_name='non_residential_units', 
-                                       choosers_fit_filter='None', segmentation_variable='all_nonresunits', segment_id=1, 
-                                       optimization_metric='significance', constraint_config=constraint_configs[model + '_constraints.yaml'],
-                                       max_iterations=1)
+                model = 'repm_value'
+                autospec_manager.autospecify_urbansim_rm_model(fitting_strategy='recipe', model_name='repm_value1', observations_name='zones', 
+                                           dep_var='avg_residential_value', segmentation_variable='all_zones', segment_id=1, fit_filters=['avg_residential_value > 0'],
+                                          var_filter_terms=['value', 'rent'], constraint_config=constraint_configs[model + '_constraints.yaml'],
+                                          max_iterations=1)
 
-            model = 'repm_value'
-            autospec_manager.autospecify_urbansim_rm_model(fitting_strategy='recipe', model_name='repm_value1', observations_name='zones', 
-                                       dep_var='avg_residential_value', segmentation_variable='all_zones', segment_id=1, fit_filters=['avg_residential_value > 0'],
-                                      var_filter_terms=['value', 'rent'], constraint_config=constraint_configs[model + '_constraints.yaml'],
-                                      max_iterations=1)
+                model = 'repm_rent'
+                autospec_manager.autospecify_urbansim_rm_model(fitting_strategy='recipe', model_name='repm_rent1', observations_name='zones', 
+                                           dep_var='avg_residential_rent', segmentation_variable='all_zones', segment_id=1, fit_filters=['avg_residential_rent > 0'],
+                                          var_filter_terms=['value', 'rent'], constraint_config=constraint_configs[model + '_constraints.yaml'],
+                                          max_iterations=1)
 
-            model = 'repm_rent'
-            autospec_manager.autospecify_urbansim_rm_model(fitting_strategy='recipe', model_name='repm_rent1', observations_name='zones', 
-                                       dep_var='avg_residential_rent', segmentation_variable='all_zones', segment_id=1, fit_filters=['avg_residential_rent > 0'],
-                                      var_filter_terms=['value', 'rent'], constraint_config=constraint_configs[model + '_constraints.yaml'],
-                                      max_iterations=1)
+                model = 'repm_nonres'
+                autospec_manager.autospecify_urbansim_rm_model(fitting_strategy='recipe', model_name='repm_nonres1', observations_name='zones', 
+                                           dep_var='avg_nonres_m2_rent', segmentation_variable='all_zones', segment_id=1, fit_filters=['avg_nonres_m2_rent > 0'],
+                                          var_filter_terms=['value', 'rent'], constraint_config=constraint_configs[model + '_constraints.yaml'],
+                                          max_iterations=1)
 
-            model = 'repm_nonres'
-            autospec_manager.autospecify_urbansim_rm_model(fitting_strategy='recipe', model_name='repm_nonres1', observations_name='zones', 
-                                       dep_var='avg_nonres_m2_rent', segmentation_variable='all_zones', segment_id=1, fit_filters=['avg_nonres_m2_rent > 0'],
-                                      var_filter_terms=['value', 'rent'], constraint_config=constraint_configs[model + '_constraints.yaml'],
-                                      max_iterations=1)
+            elif template_name == 'block':
 
-        elif template_name == 'block':
-
-            yaml_configs = {}
-            for model in models.keys():
-                print model
-                constraint_config = constraint_configs[model + '_constraints.yaml']
-                attribs = models[model]
-                print attribs
-                if attribs['model_type'] == 'location_choice':
-                    segment_ids = orca.get_table(attribs['agents_name'])[attribs['segmentation_variable']].value_counts().index.values
-                    for segment_id in segment_ids:
-                        autospec_manager.autospecify_urbansim_lcm_model(fitting_strategy = 'recipe', 
-                                                                        model_name = model + str(segment_id), 
-                                                                        agents_name = attribs['agents_name'], 
-                                                                        choosers_fit_filter = attribs['choosers_fit_filter'], 
-                                                                        segmentation_variable = attribs['segmentation_variable'], 
-                                                                        segment_id=segment_id,
-                                                                        constraint_config=constraint_config)
+                yaml_configs = {}
+                for model in models.keys():
+                    print model
+                    constraint_config = constraint_configs[model + '_constraints.yaml']
+                    attribs = models[model]
+                    print attribs
+                    if attribs['model_type'] == 'location_choice':
+                        segment_ids = orca.get_table(attribs['agents_name'])[attribs['segmentation_variable']].value_counts().index.values
+                        for segment_id in segment_ids:
+                            autospec_manager.autospecify_urbansim_lcm_model(fitting_strategy = 'recipe', 
+                                                                            model_name = model + str(segment_id), 
+                                                                            agents_name = attribs['agents_name'], 
+                                                                            choosers_fit_filter = attribs['choosers_fit_filter'], 
+                                                                            segmentation_variable = attribs['segmentation_variable'], 
+                                                                            segment_id=segment_id,
+                                                                            constraint_config=constraint_config)
 
 
 
 
-                elif attribs['model_type'] == 'regression':
-                    segment_ids = orca.get_table(attribs['observations_name'])[attribs['segmentation_variable']].value_counts().index.values
-                    for segment_id in segment_ids:
-                        autospec_manager.autospecify_urbansim_rm_model(fitting_strategy = 'recipe', 
-                                                                        model_name = model + str(segment_id), 
-                                                                        observations_name=attribs['observations_name'], 
-                                                                        dep_var=attribs['dep_var'],
-                                                                        segmentation_variable=attribs['segmentation_variable'], 
-                                                                        segment_id=segment_id,
-                                                                        fit_filters=attribs['fit_filters'],
-                                                                        var_filter_terms=attribs['var_filter_terms'],
-                                                                        constraint_config=constraint_config
-                                                                        )
+                    elif attribs['model_type'] == 'regression':
+                        segment_ids = orca.get_table(attribs['observations_name'])[attribs['segmentation_variable']].value_counts().index.values
+                        for segment_id in segment_ids:
+                            autospec_manager.autospecify_urbansim_rm_model(fitting_strategy = 'recipe', 
+                                                                            model_name = model + str(segment_id), 
+                                                                            observations_name=attribs['observations_name'], 
+                                                                            dep_var=attribs['dep_var'],
+                                                                            segmentation_variable=attribs['segmentation_variable'], 
+                                                                            segment_id=segment_id,
+                                                                            fit_filters=attribs['fit_filters'],
+                                                                            var_filter_terms=attribs['var_filter_terms'],
+                                                                            constraint_config=constraint_config
+                                                                            )
 
         """
         autospec_manager.autospecify_urbansim_lcm_model(fitting_strategy='stepwise_simple', model_name='hlcm1', agents_name='households', 
