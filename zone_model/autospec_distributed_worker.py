@@ -298,7 +298,8 @@ def process_spec_proposal_queue(estimate_function):
     results = process_queue_indefinitely('spec_proposal_queue', estimate_function, 'spec proposals', eval_items=True)
 
 
-def autospec_worker(redis_host, redis_port, geography='blocks', alternatives_id_name='block_id', build_network=True, data_path=None):
+def autospec_worker(redis_host, redis_port, geography='blocks', alternatives_id_name='block_id', build_network=True, 
+                    data_path=None, kill_upon_complete=False):
 
     # Redis connection
     global r
@@ -348,8 +349,9 @@ def autospec_worker(redis_host, redis_port, geography='blocks', alternatives_id_
         # Process the specification proposal queue
         process_spec_proposal_queue(estimate_model)
         time.sleep(.1)
-        if r.get('specification_complete') == '1':
-            break
+        if kill_upon_complete:
+            if r.get('specification_complete') == '1':
+                break
 
 
 # dcm = model_estim_fn(['block_groups_std_sector_id'])
@@ -363,9 +365,11 @@ if __name__ == '__main__':
         parser.add_argument("-p", "--redis_port", type=int, help="redis port")
         parser.add_argument("-t", "--template", type=str, help="model template")
         parser.add_argument("-d", "--data_file", help="path to .h5 data file")
+        parser.add_argument("-k", "--kill_upon_complete", action="store_true", help="whether to use calibrated coeffs")
 
         args = parser.parse_args()
 
+        kill_upon_complete = True if args.kill_upon_complete else False
         data_path = args.data_file if args.data_file else None
 
         if args.template == 'zone':
@@ -382,7 +386,7 @@ if __name__ == '__main__':
             alternatives_id_name = 'block_id'
 
         autospec_worker(args.redis_host, args.redis_port, geography=geography, build_network=build_network,
-                        alternatives_id_name=alternatives_id_name, data_path=data_path)
+                        alternatives_id_name=alternatives_id_name, data_path=data_path, kill_upon_complete=kill_upon_complete)
 
     else:
         print 'Need to specify redis host and port'

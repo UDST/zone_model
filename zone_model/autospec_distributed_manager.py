@@ -330,7 +330,7 @@ class AutospecManager(object):
 
 
     def autospecify_h5_dataset_lcm(self, choosers_table_name, model_name, choosers_fit_filter, segmentation_variable, segment_id,
-                                   fitting_strategy='stepwise_simple'):
+                                   fitting_strategy='stepwise_simple', constraint_config=None, max_iterations=0):
 
         if r.get('specification_complete') == '1':  
             reset_specification_queue_status() # If this is not the first spec run, reset spec status
@@ -342,10 +342,14 @@ class AutospecManager(object):
                                    segment_id=segment_id, 
                                    estimation_dataset_type = 'h5',
                                    estimation_model_type='location')
-
+        print model_name
+        print choosers_table_name
+        print choosers_fit_filter
+        print segmentation_variable
+        print segment_id
         if fitting_strategy == 'stepwise_simple':
             r.set('specification_started', 1)
-            specification = stepwise([], self.alts.columns, max_iterations=2, optimization_metric='significance')
+            specification = stepwise([], self.alts.columns, max_iterations=7, optimization_metric='significance')
 
             # Get YAML string for final model
             specification_check = ('yaml persist', list(specification))
@@ -355,6 +359,28 @@ class AutospecManager(object):
             final_model = r.get(result_key)
             write_to_file(final_model, model_name + str(segment_id) + '.yaml')
             set_specification_status_complete()
+
+        elif fitting_strategy == 'recipe':
+            explanatory_variables = [var for vars in [category['variables']  for category in constraint_config] for var in vars]
+            if max_iterations > 0:
+                variable_pool = self.alts.columns
+            else:
+                variable_pool = set(explanatory_variables)
+
+            r.set('specification_started', 1)
+            specification = apply_model_logic(variable_pool, max_iterations, constraint_config)
+
+            # Get YAML string for final model
+            specification_check = ('yaml persist', list(specification))
+            r.rpush('spec_proposal_queue', specification_check)
+            result_key = 'yaml_' + model_name
+            wait_for_key(result_key)
+            final_model = r.get(result_key)
+            write_to_file(final_model, model_name + str(segment_id) + '.yaml')
+            set_specification_status_complete()
+
+        else:
+            print 'Fitting strategy not recognized!'
 
 
     def autospecify_urbansim_rm_model(self, fitting_strategy='recipe', model_name='repm1', observations_name='blocks', 
@@ -1087,13 +1113,16 @@ if __name__ == '__main__':
         data_path = args.data_file if args.data_file else None
 
         if data_path:
+            segment_id = str(args.segmentid)
             autospec_manager = AutospecManager(args.redis_host, args.redis_port, 
                                                core_table_name=args.table_name, build_network=False, data_path=data_path)
 
+            #autospec_manager.autospecify_h5_dataset_lcm(args.choosers_name, args.model_name, args.filter, 
+            #                                            args.segmentation, segment_id)
+            constraint_configs = orca.get_injectable('constraint_configs')['semcog']
             autospec_manager.autospecify_h5_dataset_lcm(args.choosers_name, args.model_name, args.filter, 
-                                                        args.segmentation, args.segmentid)
-            
-     
+                                                        args.segmentation, segment_id, fitting_strategy='recipe',
+                                                        constraint_config=constraint_configs['elcmhb_constraints.yaml'])
         else:
             #autospec_manager(args.redis_host, args.redis_port)
             autospec_manager = AutospecManager(args.redis_host, args.redis_port, core_table_name='zones', build_network=False)

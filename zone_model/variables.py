@@ -169,7 +169,7 @@ def x(non_residential_units, zones):
     return misc.reindex(zones.x, non_residential_units[geography_base_id]).fillna(0)
 
 @orca.column('non_residential_units', 'y', cache=True, cache_scope='iteration')
-def y(rnon_residential_units, zones):
+def y(non_residential_units, zones):
     return misc.reindex(zones.y, non_residential_units[geography_base_id]).fillna(0)
 
 @orca.column('non_residential_units', 'all_nonresunits', cache=True)
