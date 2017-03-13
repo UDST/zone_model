@@ -1180,6 +1180,8 @@ if __name__ == '__main__':
                                           var_filter_terms=['value', 'rent'], constraint_config=constraint_configs[model + '_constraints.yaml'],
                                           max_iterations=1)
 
+                time.sleep(1000) #replace this with config upload and notification that the pod is done and can be cancelled
+
             elif template_name == 'block':
 
                 yaml_configs = {}
