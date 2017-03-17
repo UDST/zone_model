@@ -6,6 +6,12 @@ import argparse
 import numpy as np
 import pandas as pd
 
+try:
+    from google.cloud import datastore
+    client = datastore.Client()
+except:
+    print 'No connection to Cloud Data Store available.'
+
 import orca
 import urbansim
 from urbansim.models.regression import RegressionModel
@@ -234,6 +240,14 @@ def estimation_setup(alts, alternatives_id_name="block_id", store=None):
                 llr = dcm.log_likelihoods['ratio']
                 tscore = dcm.fit_parameters['T-Score'].to_dict()
                 r.set(str(spec), (llr, tscore))
+
+                ds_spec = datastore.Entity(key=client.key('Spec'))
+                ds_spec['variables'] = spec
+                ds_spec['llr'] = llr
+                ds_tscores = datastore.Entity(key=client.key('Tscores'))
+                ds_tscores.update(tscore)
+                ds_spec['tscores']=ds_tscores
+                client.put(ds_spec)
 
                 # Optional follow up action
                 if type(spec) == tuple:
