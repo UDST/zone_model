@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import redis
+import datetime
 import argparse
 import numpy as np
 import pandas as pd
@@ -178,13 +179,16 @@ def rm_estimation_function(observations, dep_var, fit_filters=None, predict_filt
     return estimate_model
 
 
-def estimation_setup(alts, alternatives_id_name="block_id", store=None):
+def estimation_setup(alts, alternatives_id_name="block_id", store=None, store_results=False):
     # Wait for manager to provide name of estimation dataset table
     wait_for_key('estimation_dataset_type')
     estimation_dataset_type = r.get('estimation_dataset_type')
 
     wait_for_key('estimation_model_type')
     estimation_model_type = r.get('estimation_model_type')
+
+    region = r.get('region')
+    run_id = r.get('run_id')
 
     ## Get model chooser arguments and calculate choosers table
     
@@ -237,24 +241,47 @@ def estimation_setup(alts, alternatives_id_name="block_id", store=None):
                 # Estimate and record
                 dcm = model_estim_fn(spec_proposal)
                 print dcm.fit_parameters
+                dcm.choosers_predict_filters = '%s == %s' % (segmentation_variable, segment_id)
+                dcm.choice_column = alternatives_id_name
                 llr = dcm.log_likelihoods['ratio']
                 tscore = dcm.fit_parameters['T-Score'].to_dict()
                 r.set(str(spec), (llr, tscore))
 
-                ds_spec = datastore.Entity(key=client.key('Spec'))
-                ds_spec['variables'] = spec
-                ds_spec['llr'] = llr
-                ds_tscores = datastore.Entity(key=client.key('Tscores'))
-                ds_tscores.update(tscore)
-                ds_spec['tscores']=ds_tscores
-                client.put(ds_spec)
+                yaml_str = dcm.to_yaml()
+                if store_results:
+                    # Persist estimation results to Google cloud datastore
+                    #import pdb; pdb.set_trace()
+                    ds_spec = datastore.Entity(key=client.key('Spec'), exclude_from_indexes=('yaml',))
+                    ds_spec['created'] = datetime.datetime.utcnow()
+                    ds_spec['creator'] = u'autospec'
+                    ds_spec['region'] = unicode(region)
+                    ds_spec['run_id'] = unicode(run_id)
+                    ds_spec['model_type'] = unicode(estimation_model_type)
+                    ds_spec['model_name'] = unicode(model_name)
+                    ds_spec['agents'] = unicode(agents_name)
+                    ds_spec['choosers_fit_filter'] = unicode(choosers_fit_filter)
+                    ds_spec['segmentation'] = unicode(segmentation_variable)
+                    ds_spec['segment_id'] = segment_id
+
+                    variables = spec if type(spec) is list else spec[1]
+                    ds_spec['variables'] = [unicode(variable) for variable in variables]
+                    ds_spec['llr'] = llr
+                    ds_tscores = datastore.Entity(key=client.key('Tscores'))
+                    ds_tscores.update(tscore)
+                    ds_spec['tscores']=ds_tscores
+                    ds_spec['yaml'] = unicode(yaml_str)
+                    try:
+                        client.put(ds_spec)
+                    except:
+                        try:
+                            time.sleep(1); print 'Trying datastore write failed, trying again in 1 second..'
+                            client.put(ds_spec)
+                        except:
+                            import pdb; pdb.set_trace()
 
                 # Optional follow up action
                 if type(spec) == tuple:
                     if action == 'yaml persist':
-                        dcm.choosers_predict_filters = '%s == %s' % (segmentation_variable, segment_id)
-                        dcm.choice_column = alternatives_id_name
-                        yaml_str = dcm.to_yaml()
                         r.set('yaml_' + model_name, yaml_str)
 
                 r.incr('spec_processed_counter')
@@ -263,7 +290,7 @@ def estimation_setup(alts, alternatives_id_name="block_id", store=None):
             except:
                 print 'Failed!'
                 r.lpush('failed_spec_proposals', str(spec))
-
+                #import pdb; pdb.set_trace()
                 r.incr('spec_processed_counter')
                 return None
 
@@ -313,7 +340,7 @@ def process_spec_proposal_queue(estimate_function):
 
 
 def autospec_worker(redis_host, redis_port, geography='blocks', alternatives_id_name='block_id', build_network=True, 
-                    data_path=None, kill_upon_complete=False):
+                    data_path=None, kill_upon_complete=False, store_results=False):
 
     # Redis connection
     global r
@@ -359,7 +386,7 @@ def autospec_worker(redis_host, redis_port, geography='blocks', alternatives_id_
     ## Do work!
     while True:
         ##  Get agents and form the estimation function
-        estimate_model = estimation_setup(alts, alternatives_id_name=alternatives_id_name, store=store)
+        estimate_model = estimation_setup(alts, alternatives_id_name=alternatives_id_name, store=store, store_results=store_results)
         # Process the specification proposal queue
         process_spec_proposal_queue(estimate_model)
         time.sleep(.1)
@@ -374,16 +401,20 @@ def autospec_worker(redis_host, redis_port, geography='blocks', alternatives_id_
 if __name__ == '__main__':
 
     if len(sys.argv) > 1:
+        time.sleep(2)
+
         parser = argparse.ArgumentParser()
         parser.add_argument("-o", "--redis_host", type=str, help="redis host")
         parser.add_argument("-p", "--redis_port", type=int, help="redis port")
         parser.add_argument("-t", "--template", type=str, help="model template")
         parser.add_argument("-d", "--data_file", help="path to .h5 data file")
         parser.add_argument("-k", "--kill_upon_complete", action="store_true", help="whether to use calibrated coeffs")
+        parser.add_argument("-s", "--store_results", action="store_true", help="whether to persist estimation results")
 
         args = parser.parse_args()
 
         kill_upon_complete = True if args.kill_upon_complete else False
+        store_results = args.store_results if args.store_results else False
         data_path = args.data_file if args.data_file else None
 
         if args.template == 'zone':
@@ -400,7 +431,8 @@ if __name__ == '__main__':
             alternatives_id_name = 'block_id'
 
         autospec_worker(args.redis_host, args.redis_port, geography=geography, build_network=build_network,
-                        alternatives_id_name=alternatives_id_name, data_path=data_path, kill_upon_complete=kill_upon_complete)
+                        alternatives_id_name=alternatives_id_name, data_path=data_path, kill_upon_complete=kill_upon_complete,
+                        store_results=store_results)
 
     else:
         print 'Need to specify redis host and port'

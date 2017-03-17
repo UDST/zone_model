@@ -2,6 +2,9 @@ import os
 import sys
 import time
 import redis
+import string
+import random
+import datetime
 import argparse
 import numpy as np
 import pandas as pd
@@ -19,6 +22,27 @@ except:
     pass
 
 np.random.seed(0)
+
+char_set = string.ascii_lowercase + string.digits  # for random alpha-numeric generation
+
+
+def generate_rand_str(length):
+    """
+    Generate a random alpha-numeric string of user-specified length, pre-pended by time-stamp.
+
+    Parameters
+    ----------
+    length : int
+        Desired length of random string.
+    Returns
+    -------
+    rand_str : string
+        Random string.
+
+    """
+    time_stamp = datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d%H%M%S')[3:]
+    randstr = ''.join(random.sample(char_set*length, length))
+    return time_stamp + randstr
 
 
 def wait_for_key(key):
@@ -253,13 +277,16 @@ class AutospecManager(object):
     specification routine, and final model selection.
 
     """
-    def __init__(self, redis_host, redis_port, core_table_name='blocks', build_network=True, data_path=None):
+    def __init__(self, redis_host, redis_port, core_table_name='blocks', build_network=True, data_path=None, region=None, run_id=None):
 
         ## Redis connection
         orca_redis = False if data_path else True
         connect_to_redis(redis_host, redis_port, flush=True, orca_redis=orca_redis)
         r.set('manager_checkedin', 1)
         print 'Redis connection made.'
+
+        r.set('region', region)
+        r.set('run_id', run_id)
 
         ## Data setup and initiate worker variable calculations, if applicable
 
@@ -1108,14 +1135,20 @@ if __name__ == '__main__':
         parser.add_argument("-f", "--filter", help="choosers fit filter")
         parser.add_argument("-s", "--segmentation", help="segmentation variable name")
         parser.add_argument("-i", "--segmentid", type=int, help="segment ID value")
+        parser.add_argument("-j", "--jobid", help="job/run ID value")
+        parser.add_argument("-r", "--region", help="region id/name")
         args = parser.parse_args()
 
         data_path = args.data_file if args.data_file else None
+        run_id = args.jobid if args.jobid else generate_rand_str(3)
+        region = args.region if args.region else 'undefined'
+        
 
         if data_path:
             segment_id = str(args.segmentid)
             autospec_manager = AutospecManager(args.redis_host, args.redis_port, 
-                                               core_table_name=args.table_name, build_network=False, data_path=data_path)
+                                               core_table_name=args.table_name, build_network=False, data_path=data_path,
+                                               region=region, run_id=run_id)
 
             #autospec_manager.autospecify_h5_dataset_lcm(args.choosers_name, args.model_name, args.filter, 
             #                                            args.segmentation, segment_id)
@@ -1125,13 +1158,14 @@ if __name__ == '__main__':
                                                         constraint_config=constraint_configs['elcmhb_constraints.yaml'])
         else:
             #autospec_manager(args.redis_host, args.redis_port)
-            autospec_manager = AutospecManager(args.redis_host, args.redis_port, core_table_name='zones', build_network=False)
-
             #autospec_manager.autospecify_url_dataset_lcm('http://synthpop-data2.s3-website-us-west-1.amazonaws.com/testdata/flint-lead-samples.csv')
 
             model_structure = orca.get_injectable('model_structure')
             template_name = model_structure['template']
             models = model_structure['models']
+
+            autospec_manager = AutospecManager(args.redis_host, args.redis_port, core_table_name=model_structure['geography'], build_network=False,
+                                               region=region, run_id=run_id)
 
             constraint_configs = orca.get_injectable('constraint_configs')[template_name]
 
@@ -1142,44 +1176,45 @@ if __name__ == '__main__':
                     autospec_manager.autospecify_urbansim_lcm_model(fitting_strategy='recipe', model_name='hlcm%s' % i, agents_name='households', 
                                                choosers_fit_filter='None', segmentation_variable='income_quartile', segment_id=i, 
                                                optimization_metric='significance', constraint_config=constraint_configs[model + '_constraints.yaml'],
-                                               max_iterations=1)
+                                               max_iterations=0)
 
                 model = 'elcm'
                 autospec_manager.autospecify_urbansim_lcm_model(fitting_strategy='recipe', model_name='elcm1', agents_name='jobs', 
                                            choosers_fit_filter='None', segmentation_variable='all_jobs', segment_id=1, 
                                            optimization_metric='significance', constraint_config=constraint_configs[model + '_constraints.yaml'],
-                                           max_iterations=1)
+                                           max_iterations=0)
 
                 model = 'rdplcm'
                 autospec_manager.autospecify_urbansim_lcm_model(fitting_strategy='recipe', model_name='rdplcm1', agents_name='residential_units', 
                                            choosers_fit_filter='None', segmentation_variable='all_resunits', segment_id=1, 
                                            optimization_metric='significance', constraint_config=constraint_configs[model + '_constraints.yaml'],
-                                           max_iterations=1)
+                                           max_iterations=0)
 
                 model = 'nrdplcm'
                 autospec_manager.autospecify_urbansim_lcm_model(fitting_strategy='recipe', model_name='nrdplcm1', agents_name='non_residential_units', 
                                            choosers_fit_filter='None', segmentation_variable='all_nonresunits', segment_id=1, 
                                            optimization_metric='significance', constraint_config=constraint_configs[model + '_constraints.yaml'],
-                                           max_iterations=1)
+                                           max_iterations=0)
 
                 model = 'repm_value'
                 autospec_manager.autospecify_urbansim_rm_model(fitting_strategy='recipe', model_name='repm_value1', observations_name='zones', 
                                            dep_var='avg_residential_value', segmentation_variable='all_zones', segment_id=1, fit_filters=['avg_residential_value > 0'],
                                           var_filter_terms=['value', 'rent'], constraint_config=constraint_configs[model + '_constraints.yaml'],
-                                          max_iterations=1)
+                                          max_iterations=0)
 
                 model = 'repm_rent'
                 autospec_manager.autospecify_urbansim_rm_model(fitting_strategy='recipe', model_name='repm_rent1', observations_name='zones', 
                                            dep_var='avg_residential_rent', segmentation_variable='all_zones', segment_id=1, fit_filters=['avg_residential_rent > 0'],
                                           var_filter_terms=['value', 'rent'], constraint_config=constraint_configs[model + '_constraints.yaml'],
-                                          max_iterations=1)
+                                          max_iterations=0)
 
                 model = 'repm_nonres'
                 autospec_manager.autospecify_urbansim_rm_model(fitting_strategy='recipe', model_name='repm_nonres1', observations_name='zones', 
                                            dep_var='avg_nonres_m2_rent', segmentation_variable='all_zones', segment_id=1, fit_filters=['avg_nonres_m2_rent > 0'],
                                           var_filter_terms=['value', 'rent'], constraint_config=constraint_configs[model + '_constraints.yaml'],
-                                          max_iterations=1)
+                                          max_iterations=0)
 
+                print 'Done!'
                 time.sleep(1000) #replace this with config upload and notification that the pod is done and can be cancelled
 
             elif template_name == 'block':
