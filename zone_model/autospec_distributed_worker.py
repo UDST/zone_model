@@ -304,7 +304,6 @@ def estimation_setup(alts, alternatives_id_name="block_id", store=None, store_re
             except:
                 print 'Failed!'
                 r.lpush('failed_spec_proposals', str(spec))
-                import pdb; pdb.set_trace()
                 r.incr('spec_processed_counter')
                 return None
 
