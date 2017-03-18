@@ -157,8 +157,8 @@ def data_setup(core_table_name, build_network=True):
     return core_table
 
 
-def define_estimation_function(model_name=None, agents_name=None, choosers_fit_filter=None, 
-                               segmentation_variable=None, segment_id=None, estimation_dataset_type = 'urbansim',
+def define_estimation_function(model_name=None, agents_name=None, choosers_fit_filter=None, alts_fit_filter=None,
+                               segmentation_variable=None, segment_id=None, estimation_dataset_type='urbansim',
                                estimation_model_type='location', url=None, observations_name=None,
                                dep_var=None, fit_filters=None, var_filter_terms=None):
     """
@@ -219,6 +219,7 @@ def define_estimation_function(model_name=None, agents_name=None, choosers_fit_f
             r.set('model_name', model_name)
             r.set('agents_name', agents_name)
             r.set('choosers_fit_filter', choosers_fit_filter)
+            r.set('alts_fit_filter', alts_fit_filter)
             r.set('segmentation_variable', segmentation_variable)
             r.set('segment_id', segment_id)
 
@@ -356,7 +357,7 @@ class AutospecManager(object):
         set_specification_status_complete()
 
 
-    def autospecify_h5_dataset_lcm(self, choosers_table_name, model_name, choosers_fit_filter, segmentation_variable, segment_id,
+    def autospecify_h5_dataset_lcm(self, choosers_table_name, model_name, choosers_fit_filter, alts_fit_filter, segmentation_variable, segment_id,
                                    fitting_strategy='stepwise_simple', constraint_config=None, max_iterations=0):
 
         if r.get('specification_complete') == '1':  
@@ -364,7 +365,8 @@ class AutospecManager(object):
 
         define_estimation_function(model_name=model_name, # function call parameters different if estimation dataset is url
                                    agents_name=choosers_table_name, 
-                                   choosers_fit_filter=choosers_fit_filter, 
+                                   choosers_fit_filter=choosers_fit_filter,
+                                   alts_fit_filter=alts_fit_filter,
                                    segmentation_variable=segmentation_variable,
                                    segment_id=segment_id, 
                                    estimation_dataset_type = 'h5',
@@ -1133,6 +1135,7 @@ if __name__ == '__main__':
         parser.add_argument("-c", "--choosers_name", help="choosers table name")
         parser.add_argument("-m", "--model_name", help="model name, e.g. elcm")
         parser.add_argument("-f", "--filter", help="choosers fit filter")
+        parser.add_argument("-a", "--altsfilter", help="alternatives fit filter")
         parser.add_argument("-s", "--segmentation", help="segmentation variable name")
         parser.add_argument("-i", "--segmentid", type=int, help="segment ID value")
         parser.add_argument("-j", "--jobid", help="job/run ID value")
@@ -1153,7 +1156,7 @@ if __name__ == '__main__':
             #autospec_manager.autospecify_h5_dataset_lcm(args.choosers_name, args.model_name, args.filter, 
             #                                            args.segmentation, segment_id)
             constraint_configs = orca.get_injectable('constraint_configs')['semcog']
-            autospec_manager.autospecify_h5_dataset_lcm(args.choosers_name, args.model_name, args.filter, 
+            autospec_manager.autospecify_h5_dataset_lcm(args.choosers_name, args.model_name, args.filter, args.altsfilter,
                                                         args.segmentation, segment_id, fitting_strategy='recipe',
                                                         constraint_config=constraint_configs['elcmhb_constraints.yaml'])
         else:

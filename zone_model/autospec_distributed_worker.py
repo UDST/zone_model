@@ -71,7 +71,7 @@ def process_queue_indefinitely(queue_key, process_func, items_name, eval_items=F
     print 'Processed %s %s.' % (i, items_name)
 
 
-def lcm_estimation_function(agents, alternatives, location_variable_name, choosers_fit_filter=None):
+def lcm_estimation_function(agents, alternatives, location_variable_name, choosers_fit_filter=None, alts_fit_filter=None):
     """
     For a given set of agents and alternatives, generates a model fitting
     function that can take arbitrary specification.
@@ -87,6 +87,8 @@ def lcm_estimation_function(agents, alternatives, location_variable_name, choose
         chosen alternative.
     choosers_fit_filter : string, optional
         Chooser fit filter to apply at the model object level.
+    alts_fit_filter : string, optional
+        Alternatives fit filter.
     Returns
     -------
     estimate_model : function
@@ -96,6 +98,12 @@ def lcm_estimation_function(agents, alternatives, location_variable_name, choose
     num_alts_to_sample = len(alternatives) - 1
     if num_alts_to_sample > 50:
         num_alts_to_sample = 50
+
+    #if (alts_fit_filter is None) | (alts_fit_filter == 'None'):
+    #    alts_fit_filter = 'x != 0'
+
+    if alts_fit_filter == 'None':
+        alts_fit_filter = None
 
     if (len(agents) > 1000) & (num_alts_to_sample >= 50):
         print 'Generating estimation function with estimation_sample_size'
@@ -107,7 +115,8 @@ def lcm_estimation_function(agents, alternatives, location_variable_name, choose
                                                                  probability_mode='single_chooser',
                                                                  choice_mode='aggregate',
                                                                  estimation_sample_size=1000,
-                                                                 choosers_fit_filters=choosers_fit_filter)
+                                                                 choosers_fit_filters=choosers_fit_filter,
+                                                                 alts_fit_filters=alts_fit_filter)
                 dcm.fit(agents, alternatives, location_variable_name)
                 return dcm
         else:
@@ -116,7 +125,8 @@ def lcm_estimation_function(agents, alternatives, location_variable_name, choose
                                                                  sample_size=num_alts_to_sample,
                                                                  probability_mode='single_chooser',
                                                                  choice_mode='aggregate',
-                                                                 estimation_sample_size=1000)
+                                                                 estimation_sample_size=1000,
+                                                                 alts_fit_filters=alts_fit_filter)
                 dcm.fit(agents, alternatives, location_variable_name)
                 return dcm
     else:
@@ -127,7 +137,8 @@ def lcm_estimation_function(agents, alternatives, location_variable_name, choose
                                                                  sample_size=num_alts_to_sample,
                                                                  probability_mode='single_chooser',
                                                                  choice_mode='aggregate',
-                                                                 choosers_fit_filters=choosers_fit_filter)
+                                                                 choosers_fit_filters=choosers_fit_filter,
+                                                                 alts_fit_filters=alts_fit_filter)
                 dcm.fit(agents, alternatives, location_variable_name)
                 return dcm
         else:
@@ -135,7 +146,8 @@ def lcm_estimation_function(agents, alternatives, location_variable_name, choose
                 dcm = urbansim.models.dcm.MNLDiscreteChoiceModel(model_expression=specification,
                                                                  sample_size=num_alts_to_sample,
                                                                  probability_mode='single_chooser',
-                                                                 choice_mode='aggregate')
+                                                                 choice_mode='aggregate',
+                                                                 alts_fit_filters=alts_fit_filter)
                 dcm.fit(agents, alternatives, location_variable_name)
                 return dcm
     return estimate_model
@@ -205,6 +217,7 @@ def estimation_setup(alts, alternatives_id_name="block_id", store=None, store_re
         if estimation_model_type == 'location':
             agents_name = r.get('agents_name')
             choosers_fit_filter = r.get('choosers_fit_filter')
+            alts_fit_filter = r.get('alts_fit_filter')
             segmentation_variable = r.get('segmentation_variable')
             segment_id = int(r.get('segment_id'))
             if estimation_dataset_type == 'h5':
@@ -228,7 +241,7 @@ def estimation_setup(alts, alternatives_id_name="block_id", store=None, store_re
     if estimation_model_type == 'location':
         if choosers_fit_filter == 'None':    choosers_fit_filter = None
         model_estim_fn = lcm_estimation_function(agents_for_estimation, alts, alternatives_id_name,
-                                                      choosers_fit_filter=choosers_fit_filter)
+                                                 choosers_fit_filter=choosers_fit_filter, alts_fit_filter=alts_fit_filter)
         def estimate_model(spec):
             try:
                 # Determine task type
@@ -260,6 +273,7 @@ def estimation_setup(alts, alternatives_id_name="block_id", store=None, store_re
                     ds_spec['model_name'] = unicode(model_name)
                     ds_spec['agents'] = unicode(agents_name)
                     ds_spec['choosers_fit_filter'] = unicode(choosers_fit_filter)
+                    ds_spec['alts_fit_filter'] = unicode(alts_fit_filter)
                     ds_spec['segmentation'] = unicode(segmentation_variable)
                     ds_spec['segment_id'] = segment_id
 
@@ -290,7 +304,7 @@ def estimation_setup(alts, alternatives_id_name="block_id", store=None, store_re
             except:
                 print 'Failed!'
                 r.lpush('failed_spec_proposals', str(spec))
-                #import pdb; pdb.set_trace()
+                import pdb; pdb.set_trace()
                 r.incr('spec_processed_counter')
                 return None
 
