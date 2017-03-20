@@ -2,6 +2,8 @@ import os
 import sys
 import time
 import redis
+import string
+import random
 import datetime
 import argparse
 import numpy as np
@@ -22,6 +24,27 @@ import variables
 import models
 
 np.random.seed(0)
+
+char_set = string.ascii_lowercase + string.digits  # for random alpha-numeric generation
+
+
+def generate_rand_str(length):
+    """
+    Generate a random alpha-numeric string of user-specified length, pre-pended by time-stamp.
+
+    Parameters
+    ----------
+    length : int
+        Desired length of random string.
+    Returns
+    -------
+    rand_str : string
+        Random string.
+
+    """
+    time_stamp = datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d%H%M%S')[3:]
+    randstr = ''.join(random.sample(char_set*length, length))
+    return time_stamp + randstr
 
 
 def wait_for_key(key):
@@ -69,6 +92,63 @@ def process_queue_indefinitely(queue_key, process_func, items_name, eval_items=F
             i += 1
 
     print 'Processed %s %s.' % (i, items_name)
+
+
+def new_cloud_datastore_record(region, run_id, estimation_model_type, model_name):
+    ds_spec = datastore.Entity(key=client.key('Spec'), exclude_from_indexes=('yaml',))
+    ds_spec['created'] = datetime.datetime.utcnow()
+    ds_spec['creator'] = u'autospec'
+    ds_spec['region'] = unicode(region)
+    ds_spec['run_id'] = unicode(run_id)
+    ds_spec['model_type'] = unicode(estimation_model_type)
+    ds_spec['model_name'] = unicode(model_name)
+    return ds_spec
+
+
+def to_cloud_datastore(ds_entity):
+    try:
+        client.put(ds_entity)
+    except:
+        time.sleep(1); print 'Trying datastore write failed, trying again in 1 second..'
+        client.put(ds_entity)
+    spec_id = ds_entity.key.id
+    return spec_id
+
+
+def lcm_datastore_record(ds_spec, agents_name, choosers_fit_filter, alts_fit_filter,
+                         segmentation_variable, segment_id, spec, llr, tscore, yaml_str):
+    ds_spec['agents'] = unicode(agents_name)
+    ds_spec['choosers_fit_filter'] = unicode(choosers_fit_filter)
+    ds_spec['alts_fit_filter'] = unicode(alts_fit_filter)
+    ds_spec['segmentation'] = unicode(segmentation_variable)
+    ds_spec['segment_id'] = segment_id
+
+    variables = spec if type(spec) is list else spec[1]
+    ds_spec['variables'] = [unicode(variable) for variable in variables]
+    ds_spec['llr'] = llr
+    ds_tscores = datastore.Entity(key=client.key('Tscores'))
+    ds_tscores.update(tscore)
+    ds_spec['tscores']=ds_tscores
+    ds_spec['yaml'] = unicode(yaml_str)
+    return ds_spec
+
+
+def rm_datastore_record(ds_spec, observations_name, dep_var, fit_filters,
+                         segmentation_variable, segment_id, spec, r2, tscore, yaml_str):
+    ds_spec['observations_name'] = unicode(observations_name)
+    ds_spec['dep_var'] = unicode(dep_var)
+    ds_spec['fit_filters'] = fit_filters
+    ds_spec['segmentation'] = unicode(segmentation_variable)
+    ds_spec['segment_id'] = segment_id
+
+    variables = spec if type(spec) is list else spec[1]
+    ds_spec['variables'] = [unicode(variable) for variable in variables]
+    ds_spec['r2'] = r2
+    ds_tscores = datastore.Entity(key=client.key('Tscores'))
+    ds_tscores.update(tscore)
+    ds_spec['tscores']=ds_tscores
+    ds_spec['yaml'] = unicode(yaml_str)
+    return ds_spec
 
 
 def lcm_estimation_function(agents, alternatives, location_variable_name, choosers_fit_filter=None, alts_fit_filter=None):
@@ -258,40 +338,17 @@ def estimation_setup(alts, alternatives_id_name="block_id", store=None, store_re
                 dcm.choice_column = alternatives_id_name
                 llr = dcm.log_likelihoods['ratio']
                 tscore = dcm.fit_parameters['T-Score'].to_dict()
-                r.set(str(spec), (llr, tscore))
-
                 yaml_str = dcm.to_yaml()
+
                 if store_results:
                     # Persist estimation results to Google cloud datastore
-                    #import pdb; pdb.set_trace()
-                    ds_spec = datastore.Entity(key=client.key('Spec'), exclude_from_indexes=('yaml',))
-                    ds_spec['created'] = datetime.datetime.utcnow()
-                    ds_spec['creator'] = u'autospec'
-                    ds_spec['region'] = unicode(region)
-                    ds_spec['run_id'] = unicode(run_id)
-                    ds_spec['model_type'] = unicode(estimation_model_type)
-                    ds_spec['model_name'] = unicode(model_name)
-                    ds_spec['agents'] = unicode(agents_name)
-                    ds_spec['choosers_fit_filter'] = unicode(choosers_fit_filter)
-                    ds_spec['alts_fit_filter'] = unicode(alts_fit_filter)
-                    ds_spec['segmentation'] = unicode(segmentation_variable)
-                    ds_spec['segment_id'] = segment_id
-
-                    variables = spec if type(spec) is list else spec[1]
-                    ds_spec['variables'] = [unicode(variable) for variable in variables]
-                    ds_spec['llr'] = llr
-                    ds_tscores = datastore.Entity(key=client.key('Tscores'))
-                    ds_tscores.update(tscore)
-                    ds_spec['tscores']=ds_tscores
-                    ds_spec['yaml'] = unicode(yaml_str)
-                    try:
-                        client.put(ds_spec)
-                    except:
-                        try:
-                            time.sleep(1); print 'Trying datastore write failed, trying again in 1 second..'
-                            client.put(ds_spec)
-                        except:
-                            import pdb; pdb.set_trace()
+                    ds_spec = new_cloud_datastore_record(region, run_id, estimation_model_type, model_name)
+                    ds_spec = lcm_datastore_record(ds_spec, agents_name, choosers_fit_filter, alts_fit_filter,
+                                             segmentation_variable, segment_id, spec, llr, tscore, yaml_str)
+                    spec_id = to_cloud_datastore(ds_spec)
+                    r.set(str(spec), (llr, tscore, spec_id))
+                else:
+                    r.set(str(spec), (llr, tscore, generate_rand_str(4)))
 
                 # Optional follow up action
                 if type(spec) == tuple:
@@ -303,6 +360,7 @@ def estimation_setup(alts, alternatives_id_name="block_id", store=None, store_re
 
             except:
                 print 'Failed!'
+                import pdb; pdb.set_trace()
                 r.lpush('failed_spec_proposals', str(spec))
                 r.incr('spec_processed_counter')
                 return None
@@ -324,13 +382,22 @@ def estimation_setup(alts, alternatives_id_name="block_id", store=None, store_re
                 print rm.fit_parameters
                 r2 = rm.model_fit.rsquared_adj
                 tscore = rm.fit_parameters['T-Score'].to_dict()
-                r.set(str(spec), (r2, tscore))
+                rm.predict_filters = '%s == %s' % (segmentation_variable, segment_id)
+                yaml_str = rm.to_yaml()
+
+                if store_results:
+                    # Persist estimation results to Google cloud datastore
+                    ds_spec = new_cloud_datastore_record(region, run_id, estimation_model_type, model_name)
+                    ds_spec = rm_datastore_record(ds_spec, observations_name, dep_var, fit_filters,
+                         segmentation_variable, segment_id, spec, r2, tscore, yaml_str)
+                    spec_id = to_cloud_datastore(ds_spec)
+                    r.set(str(spec), (r2, tscore, spec_id))
+                else:
+                    r.set(str(spec), (r2, tscore), generate_rand_str(4))
 
                 # Optional follow up action
                 if type(spec) == tuple:
                     if action == 'yaml persist':
-                        rm.predict_filters = '%s == %s' % (segmentation_variable, segment_id)
-                        yaml_str = rm.to_yaml()
                         r.set('yaml_' + model_name, yaml_str)
 
                 r.incr('spec_processed_counter')
@@ -338,7 +405,7 @@ def estimation_setup(alts, alternatives_id_name="block_id", store=None, store_re
 
             except:
                 print 'Failed!'
-
+                import pdb; pdb.set_trace()
                 r.incr('spec_processed_counter')
                 r.lpush('failed_spec_proposals', str(spec))
                 return None

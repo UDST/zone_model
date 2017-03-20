@@ -18,6 +18,8 @@ import models
 
 try:
     import autospec_recipes
+    from google.cloud import datastore
+    client = datastore.Client()
 except:
     pass
 
@@ -272,13 +274,24 @@ def set_specification_status_complete():
     r.set('specification_complete', 1) # Instruct workers to break from their current listening loop
 
 
+def mark_as_selected():
+    """Tag final model as selected and returns yaml for final model."""
+    spec_id = r.get('latest_spec_id')
+    key = client.key('Spec', long(spec_id))
+    spec = client.get(key)
+    spec['selected'] = True
+    client.put(spec)
+    return spec['yaml']
+
+
 class AutospecManager(object):
     """
     Manager for the auto-specification process.  Coordinates data setup, step-wise model 
     specification routine, and final model selection.
 
     """
-    def __init__(self, redis_host, redis_port, core_table_name='blocks', build_network=True, data_path=None, region=None, run_id=None):
+    def __init__(self, redis_host, redis_port, core_table_name='blocks', build_network=True, 
+                 data_path=None, region=None, run_id=None, cloud=False):
 
         ## Redis connection
         orca_redis = False if data_path else True
@@ -299,6 +312,8 @@ class AutospecManager(object):
             core_table = data_setup(core_table_name, build_network=build_network)
             self.alts = create_alternatives_dataframe(core_table)
 
+        self.cloud_storage = cloud
+
 
     def autospecify_urbansim_lcm_model(self, fitting_strategy='recipe', model_name='hlcm1', agents_name='households', 
                                    choosers_fit_filter='recent_mover == 1', segmentation_variable='income_quartile', segment_id=1,
@@ -318,7 +333,10 @@ class AutospecManager(object):
         """evaluate_variable_set(alts.columns, [], 'lcm')"""
         if fitting_strategy == 'stepwise_simple':
             r.set('specification_started', 1)
-            specification = stepwise([], self.alts.columns[:100], max_iterations=max_iterations, optimization_metric=optimization_metric)
+            specification = stepwise([], self.alts.columns, max_iterations=max_iterations, optimization_metric=optimization_metric)
+            if self.cloud_storage:
+                final_model = mark_as_selected()
+                write_to_file(final_model, model_name + '.yaml')
             set_specification_status_complete()
 
         elif fitting_strategy == 'recipe':
@@ -332,11 +350,14 @@ class AutospecManager(object):
             specification = apply_model_logic(variable_pool, max_iterations, constraint_config)
 
             # Get YAML string for final model
-            specification_check = ('yaml persist', list(specification))
-            r.rpush('spec_proposal_queue', specification_check)
-            result_key = 'yaml_' + model_name
-            wait_for_key(result_key)
-            final_model = r.get(result_key)
+            if self.cloud_storage:
+                final_model = mark_as_selected()
+            else:
+                specification_check = ('yaml persist', list(specification))
+                r.rpush('spec_proposal_queue', specification_check)
+                result_key = 'yaml_' + model_name
+                wait_for_key(result_key)
+                final_model = r.get(result_key)
             write_to_file(final_model, model_name + '.yaml')
             set_specification_status_complete()
 
@@ -371,21 +392,20 @@ class AutospecManager(object):
                                    segment_id=segment_id, 
                                    estimation_dataset_type = 'h5',
                                    estimation_model_type='location')
-        print model_name
-        print choosers_table_name
-        print choosers_fit_filter
-        print segmentation_variable
-        print segment_id
+
         if fitting_strategy == 'stepwise_simple':
             r.set('specification_started', 1)
             specification = stepwise([], self.alts.columns, max_iterations=7, optimization_metric='significance')
 
             # Get YAML string for final model
-            specification_check = ('yaml persist', list(specification))
-            r.rpush('spec_proposal_queue', specification_check)
-            result_key = 'yaml_' + model_name
-            wait_for_key(result_key)
-            final_model = r.get(result_key)
+            if self.cloud_storage:
+                final_model = mark_as_selected()
+            else:
+                specification_check = ('yaml persist', list(specification))
+                r.rpush('spec_proposal_queue', specification_check)
+                result_key = 'yaml_' + model_name
+                wait_for_key(result_key)
+                final_model = r.get(result_key)
             write_to_file(final_model, model_name + str(segment_id) + '.yaml')
             set_specification_status_complete()
 
@@ -400,11 +420,14 @@ class AutospecManager(object):
             specification = apply_model_logic(variable_pool, max_iterations, constraint_config)
 
             # Get YAML string for final model
-            specification_check = ('yaml persist', list(specification))
-            r.rpush('spec_proposal_queue', specification_check)
-            result_key = 'yaml_' + model_name
-            wait_for_key(result_key)
-            final_model = r.get(result_key)
+            if self.cloud_storage:
+                final_model = mark_as_selected()
+            else:
+                specification_check = ('yaml persist', list(specification))
+                r.rpush('spec_proposal_queue', specification_check)
+                result_key = 'yaml_' + model_name
+                wait_for_key(result_key)
+                final_model = r.get(result_key)
             write_to_file(final_model, model_name + str(segment_id) + '.yaml')
             set_specification_status_complete()
 
@@ -441,6 +464,9 @@ class AutospecManager(object):
         if fitting_strategy == 'stepwise_simple':
             r.set('specification_started', 1)
             specification = rm_stepwise([], variable_pool, dep_var, max_iterations=max_iterations)
+            if self.cloud_storage:
+                final_model = mark_as_selected()
+                write_to_file(final_model, model_name + '.yaml')
             set_specification_status_complete()
 
         elif fitting_strategy == 'recipe':
@@ -454,11 +480,14 @@ class AutospecManager(object):
             specification = rm_apply_model_logic(variable_pool, max_iterations, dep_var, constraint_config)
 
             # Get YAML string for final model
-            specification_check = ('yaml persist', list(specification))
-            r.rpush('spec_proposal_queue', specification_check)
-            result_key = 'yaml_' + model_name
-            wait_for_key(result_key)
-            final_model = r.get(result_key)
+            if self.cloud_storage:
+                final_model = mark_as_selected()
+            else:
+                specification_check = ('yaml persist', list(specification))
+                r.rpush('spec_proposal_queue', specification_check)
+                result_key = 'yaml_' + model_name
+                wait_for_key(result_key)
+                final_model = r.get(result_key)
             write_to_file(final_model, model_name + '.yaml')
             set_specification_status_complete()
 
@@ -707,6 +736,7 @@ def stepwise(base_specification, variable_pool, minimum_t_value=1.8, optimizatio
         # Update redis with this iteration's chosen specification
         r.set('iteration_%s_spec' % count, base_specification)
         r.set('iteration_%s_model' % count, latest_model)
+        r.set('latest_spec_id', latest_model[2])
         time.sleep(.2)
 
         if vars_to_monitor:
@@ -828,6 +858,7 @@ def rm_stepwise(base_specification, variable_pool, dep_var, minimum_t_value=1.8,
         # Update redis with this iteration's chosen specification
         r.set('iteration_%s_spec' % count, base_specification)
         r.set('iteration_%s_model' % count, latest_model)
+        r.set('latest_spec_id', latest_model[2])
         time.sleep(.2)
 
         if vars_to_monitor:
@@ -916,6 +947,7 @@ def evaluate_variable_category(variable_group, required_sign, vars_to_monitor, b
 
             base_specification.add(idx_max_llr)
             vars_to_monitor[idx_max_llr] = required_sign
+            r.set('latest_spec_id', models[idx_max_llr][2])
         else:
             print 'No variable that does not counter-productively influence an existing required category'
 
@@ -1115,6 +1147,7 @@ def rm_evaluate_variable_category(variable_group, required_sign, vars_to_monitor
 
             base_specification.add(idx_max_r2)
             vars_to_monitor[idx_max_r2] = required_sign
+            r.set('latest_spec_id', models[idx_max_r2][2])
         else:
             print 'No variable that does not counter-productively influence an existing required category'
 
@@ -1140,12 +1173,14 @@ if __name__ == '__main__':
         parser.add_argument("-i", "--segmentid", type=int, help="segment ID value")
         parser.add_argument("-j", "--jobid", help="job/run ID value")
         parser.add_argument("-r", "--region", help="region id/name")
+        parser.add_argument("-g", "--store_results", action="store_true", help="whether to get results from cloud storage")
         args = parser.parse_args()
 
         data_path = args.data_file if args.data_file else None
-        run_id = args.jobid if args.jobid else generate_rand_str(3)
         region = args.region if args.region else 'undefined'
-        
+        store_results = args.store_results if args.store_results else False
+        run_id = args.jobid if args.jobid else generate_rand_str(3)
+        print 'Run_id is %s' % run_id
 
         if data_path:
             segment_id = str(args.segmentid)
@@ -1167,8 +1202,8 @@ if __name__ == '__main__':
             template_name = model_structure['template']
             models = model_structure['models']
 
-            autospec_manager = AutospecManager(args.redis_host, args.redis_port, core_table_name=model_structure['geography'], build_network=False,
-                                               region=region, run_id=run_id)
+            autospec_manager = AutospecManager(args.redis_host, args.redis_port, core_table_name=model_structure['geography'],
+                                               build_network=False, region=region, run_id=run_id, cloud=store_results)
 
             constraint_configs = orca.get_injectable('constraint_configs')[template_name]
 
