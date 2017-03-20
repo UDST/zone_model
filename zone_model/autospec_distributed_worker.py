@@ -116,8 +116,10 @@ def to_cloud_datastore(ds_entity):
 
 
 def lcm_datastore_record(ds_spec, agents_name, choosers_fit_filter, alts_fit_filter,
-                         segmentation_variable, segment_id, spec, llr, tscore, yaml_str):
+                         segmentation_variable, segment_id, spec, llr, tscore, yaml_str,
+                         geography_name):
     ds_spec['agents'] = unicode(agents_name)
+    ds_spec['alternatives'] = unicode(geography_name)
     ds_spec['choosers_fit_filter'] = unicode(choosers_fit_filter)
     ds_spec['alts_fit_filter'] = unicode(alts_fit_filter)
     ds_spec['segmentation'] = unicode(segmentation_variable)
@@ -271,7 +273,7 @@ def rm_estimation_function(observations, dep_var, fit_filters=None, predict_filt
     return estimate_model
 
 
-def estimation_setup(alts, alternatives_id_name="block_id", store=None, store_results=False):
+def estimation_setup(alts, geography_name, alternatives_id_name="block_id", store=None, store_results=False):
     # Wait for manager to provide name of estimation dataset table
     wait_for_key('estimation_dataset_type')
     estimation_dataset_type = r.get('estimation_dataset_type')
@@ -344,7 +346,8 @@ def estimation_setup(alts, alternatives_id_name="block_id", store=None, store_re
                     # Persist estimation results to Google cloud datastore
                     ds_spec = new_cloud_datastore_record(region, run_id, estimation_model_type, model_name)
                     ds_spec = lcm_datastore_record(ds_spec, agents_name, choosers_fit_filter, alts_fit_filter,
-                                             segmentation_variable, segment_id, spec, llr, tscore, yaml_str)
+                                             segmentation_variable, segment_id, spec, llr, tscore, yaml_str,
+                                             geography_name)
                     spec_id = to_cloud_datastore(ds_spec)
                     r.set(str(spec), (llr, tscore, spec_id))
                 else:
@@ -466,7 +469,8 @@ def autospec_worker(redis_host, redis_port, geography='blocks', alternatives_id_
     ## Do work!
     while True:
         ##  Get agents and form the estimation function
-        estimate_model = estimation_setup(alts, alternatives_id_name=alternatives_id_name, store=store, store_results=store_results)
+        estimate_model = estimation_setup(alts, geography, alternatives_id_name=alternatives_id_name, 
+                                          store=store, store_results=store_results)
         # Process the specification proposal queue
         process_spec_proposal_queue(estimate_model)
         time.sleep(.1)

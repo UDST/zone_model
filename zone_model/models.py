@@ -17,6 +17,9 @@ import utils
 import datasources
 import variables
 
+from google.cloud import datastore
+client = datastore.Client()
+
 geography_base_id = orca.get_injectable('geography_id')
 
 @orca.step('refresh_h5')
@@ -281,27 +284,6 @@ def write_yaml_config(file_name, data):
 
 
 def make_lcm_func(model_name, yaml_file, agents_name, alts_name, alts_id_name, supply_attrib, remaining_capacity_attrib):
-    """
-    Generator function for LCM simulation steps.
-    """
-    if 'calibrated' in orca.list_injectables():
-        if orca.get_injectable('calibrated') == True:
-            calibration_geography_id = orca.get_injectable('model_structure')['calibration']['calibration_geography_id']
-            config = read_yaml_config(yaml_file)
-            model_base_name = ''.join([s for s in model_name if not s.isdigit()])
-            dummy_path = './data/calib_dummies.csv'
-            if os.path.exists(dummy_path):
-                calib_dummies = pd.read_csv(dummy_path, dtype={calibration_geography_id:"object"}).set_index(calibration_geography_id)
-                for rec in calib_dummies[model_base_name].iteritems():
-                    calib_geo, dummy_val = rec
-                    calib_var_name = '%s_is_%s' % (calibration_geography_id, calib_geo)
-                    config['model_expression'].add(calib_var_name)
-                    config['fit_parameters']['Coefficient'][calib_var_name] = float(dummy_val)
-                yaml_file = '%s_calib.yaml'%model_name
-                write_yaml_config(yaml_file, config)
-            else:
-                print 'Calibrated dummies not generated yet.'
-        
     @orca.step(model_name)
     def func():
         agents = orca.get_table(agents_name)
@@ -313,79 +295,51 @@ def make_lcm_func(model_name, yaml_file, agents_name, alts_name, alts_id_name, s
                                   remaining_capacity_attrib)
     return func
 
-def make_hlcm_func(model_name, yaml_file):
-    """
-    Generator function for zone HLCMs.
-    """
-    func = make_lcm_func(model_name, yaml_file, 'households', 'zones', geography_base_id, 'residential_units', 'vacant_residential_units')
-    return func
 
-def make_elcm_func(model_name, yaml_file):
+def make_repm_func(model_name, yaml_file, dep_var, observations_name):
     """
-    Generator function for zone ELCMs.
+    Generator function for block REPMs.
     """
-    func = make_lcm_func(model_name, yaml_file, 'jobs', 'zones', geography_base_id, 'job_spaces', 'vacant_job_spaces')
-    return func
-
-def make_rdplcm_func(model_name, yaml_file):
-    """
-    Generator function for zone RDPLCMs.
-    """
-    func = make_lcm_func(model_name, yaml_file, 'residential_units', 'zones', geography_base_id, 'du_spaces', 'vacant_du_spaces')
-    return func
-
-def make_repm_func(model_name, yaml_file):
-    """
-    Generator function for zone REPMs.
-    """
-    model_base_name = ''.join([s for s in model_name if not s.isdigit()])
-    model_structure = orca.get_injectable('model_structure')['models'][model_base_name]
-    dep_var = model_structure['dep_var']
 
     @orca.step(model_name)
     def func():
-        zones = orca.get_table('zones')
+        obs = orca.get_table(observations_name)
         print yaml_file
-        return utils.hedonic_simulate(yaml_file, zones,
+        return utils.hedonic_simulate(yaml_file, obs,
                                       [], dep_var)
     return func
 
 
-def register_fitted_models():
-    yaml_cfg = yamlio.yaml_to_dict(str_or_buffer='./configs/yaml_configs.yaml')
-    hlcm = register_orca_steps_for_segmented_model(yaml_cfg['hlcm'], make_hlcm_func)
-    elcm = register_orca_steps_for_segmented_model(yaml_cfg['elcm'], make_elcm_func)
-    rdplcm = register_orca_steps_for_segmented_model(yaml_cfg['rdplcm'], make_rdplcm_func)
-    rent_repm = register_orca_steps_for_segmented_model(yaml_cfg['repm_rent'], make_repm_func)
-    value_repm = register_orca_steps_for_segmented_model(yaml_cfg['repm_value'], make_repm_func)
+def get_selected_models_by_version(model_version_id):
+    query = client.query(kind='Spec')
+    query.add_filter('run_id', '=', model_version_id)
+    query.add_filter('selected', '=', True)
+    return list(query.fetch())
 
 
-def register_orca_steps_for_segmented_model(model_yaml_filenames, model_generator):
-    """
-    Register model functions as orca steps, for a given list of YAML configurations.
+models_version_id = '70320150328dnh'  ## pull this into config file
+models = get_selected_models_by_version(models_version_id)
 
-    Parameters
-    ----------
-    model_yaml_filenames : list of str
-        List of YAML filenames to register as orca steps. Typically each YAML file
-        refers to one auto-fited segment of a segmented model.
-    model_generator : function
-        Generator function for creating and registering model functions.
+for model in models:
+    model_type = model['model_type']
+    model_name = model['model_name']
+    yaml_cfg = model['yaml']
+    dict_cfg = yaml.load(yaml_cfg)
+    
+    if model_type == 'location':
+        agents = model['agents']
+        alternatives = model['alternatives']
+        alternatives_id_name = dict_cfg['choice_column']
+        supply_variable = agents + '_spaces'
+        vacant_variable = 'vacant_' + supply_variable
+        make_lcm_func(model_name,  yaml_cfg, agents, alternatives, alternatives_id_name, 
+                      supply_variable, vacant_variable)
 
-    Returns
-    -------
-    model : list of str
-        List of model names that have been registered with orca.
+    elif model_type == 'regression':
+        dep_var = model['dep_var']
+        obs_name = model['observations_name']
+        make_repm_func(model_name, yaml_cfg, dep_var, obs_name)
+        
+    else:
+        print 'Model type "%s" unrecognized' % model_type
 
-    """
-    model = []
-    for yaml_file in model_yaml_filenames:
-        model_name = yaml_file.split('.')[0]
-        model.append(model_name)
-
-        # Create LCM function and register with orca
-        model_generator(model_name, yaml_file)
-    return model
-
-
-#register_fitted_models()
