@@ -284,6 +284,15 @@ def mark_as_selected():
     return spec['yaml']
 
 
+def record_progress(run_id, status, progress):
+    """Record progress of autospec run."""
+    key = client.key('Autospec', run_id)
+    autospec_run = client.get(key)
+    autospec_run['status'] = unicode(status)
+    autospec_run['progress'] = progress
+    client.put(autospec_run)
+
+
 class AutospecManager(object):
     """
     Manager for the auto-specification process.  Coordinates data setup, step-wise model 
@@ -1182,6 +1191,8 @@ if __name__ == '__main__':
         run_id = args.jobid if args.jobid else generate_rand_str(3)
         print 'Run_id is %s' % run_id
 
+        record_progress(run_id, 'Starting', 0.0)
+
         if data_path:
             segment_id = str(args.segmentid)
             autospec_manager = AutospecManager(args.redis_host, args.redis_port, 
@@ -1209,12 +1220,7 @@ if __name__ == '__main__':
 
             if template_name == 'zone':
 
-                model = 'hlcm'
-                for i in range(1,5):
-                    autospec_manager.autospecify_urbansim_lcm_model(fitting_strategy='recipe', model_name='hlcm%s' % i, agents_name='households', 
-                                               choosers_fit_filter='None', segmentation_variable='income_quartile', segment_id=i, 
-                                               optimization_metric='significance', constraint_config=constraint_configs[model + '_constraints.yaml'],
-                                               max_iterations=0)
+                record_progress(run_id, 'Running', 0.0)
 
                 model = 'elcm'
                 autospec_manager.autospecify_urbansim_lcm_model(fitting_strategy='recipe', model_name='elcm1', agents_name='jobs', 
@@ -1222,11 +1228,7 @@ if __name__ == '__main__':
                                            optimization_metric='significance', constraint_config=constraint_configs[model + '_constraints.yaml'],
                                            max_iterations=0)
 
-                model = 'rdplcm'
-                autospec_manager.autospecify_urbansim_lcm_model(fitting_strategy='recipe', model_name='rdplcm1', agents_name='residential_units', 
-                                           choosers_fit_filter='None', segmentation_variable='all_resunits', segment_id=1, 
-                                           optimization_metric='significance', constraint_config=constraint_configs[model + '_constraints.yaml'],
-                                           max_iterations=0)
+                record_progress(run_id, 'Running', 0.1)
 
                 model = 'nrdplcm'
                 autospec_manager.autospecify_urbansim_lcm_model(fitting_strategy='recipe', model_name='nrdplcm1', agents_name='non_residential_units', 
@@ -1234,11 +1236,32 @@ if __name__ == '__main__':
                                            optimization_metric='significance', constraint_config=constraint_configs[model + '_constraints.yaml'],
                                            max_iterations=0)
 
+                record_progress(run_id, 'Running', 0.2)
+
+                model = 'rdplcm'
+                autospec_manager.autospecify_urbansim_lcm_model(fitting_strategy='recipe', model_name='rdplcm1', agents_name='residential_units', 
+                                           choosers_fit_filter='None', segmentation_variable='all_resunits', segment_id=1, 
+                                           optimization_metric='significance', constraint_config=constraint_configs[model + '_constraints.yaml'],
+                                           max_iterations=0)
+
+                record_progress(run_id, 'Running', 0.3)
+
+                model = 'hlcm'
+                for i in range(1,5):
+                    autospec_manager.autospecify_urbansim_lcm_model(fitting_strategy='recipe', model_name='hlcm%s' % i, agents_name='households', 
+                                               choosers_fit_filter='None', segmentation_variable='income_quartile', segment_id=i, 
+                                               optimization_metric='significance', constraint_config=constraint_configs[model + '_constraints.yaml'],
+                                               max_iterations=0)
+
+                record_progress(run_id, 'Running', 0.7)
+
                 model = 'repm_value'
                 autospec_manager.autospecify_urbansim_rm_model(fitting_strategy='recipe', model_name='repm_value1', observations_name='zones', 
                                            dep_var='avg_residential_value', segmentation_variable='all_zones', segment_id=1, fit_filters=['avg_residential_value > 0'],
                                           var_filter_terms=['value', 'rent'], constraint_config=constraint_configs[model + '_constraints.yaml'],
                                           max_iterations=0)
+
+                record_progress(run_id, 'Running', 0.8)
 
                 model = 'repm_rent'
                 autospec_manager.autospecify_urbansim_rm_model(fitting_strategy='recipe', model_name='repm_rent1', observations_name='zones', 
@@ -1246,12 +1269,15 @@ if __name__ == '__main__':
                                           var_filter_terms=['value', 'rent'], constraint_config=constraint_configs[model + '_constraints.yaml'],
                                           max_iterations=0)
 
+                record_progress(run_id, 'Running', 0.9)
+
                 model = 'repm_nonres'
                 autospec_manager.autospecify_urbansim_rm_model(fitting_strategy='recipe', model_name='repm_nonres1', observations_name='zones', 
                                            dep_var='avg_nonres_m2_rent', segmentation_variable='all_zones', segment_id=1, fit_filters=['avg_nonres_m2_rent > 0'],
                                           var_filter_terms=['value', 'rent'], constraint_config=constraint_configs[model + '_constraints.yaml'],
                                           max_iterations=0)
 
+                record_progress(run_id, 'Completed', 1.0)
                 print 'Done!'
                 time.sleep(1000) #replace this with config upload and notification that the pod is done and can be cancelled
 
