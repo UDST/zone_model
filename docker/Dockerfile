@@ -16,7 +16,7 @@ RUN pip install -e git+https://456d1a9002992943f5045b7e1a2d25eeb2589371:x-oauth-
 RUN pip install -e git+https://456d1a9002992943f5045b7e1a2d25eeb2589371:x-oauth-basic@github.com/urbansim/demographic_data.git#egg=adskdemographicdataauto
 RUN pip install -e git+https://456d1a9002992943f5045b7e1a2d25eeb2589371:x-oauth-basic@github.com/urbansim/orca_test.git#egg=orca_test
 
-RUN pip install --upgrade google-cloud-datastore
+RUN pip install google-cloud-datastore
 
 WORKDIR /
 
