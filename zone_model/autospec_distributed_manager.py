@@ -286,7 +286,7 @@ def mark_as_selected():
 
 def record_progress(run_id, status, progress):
     """Record progress of autospec run."""
-    key = client.key('Autospec', run_id)
+    key = client.key('Job', run_id)
     autospec_run = client.get(key)
     autospec_run['status'] = unicode(status)
     autospec_run['progress'] = progress
