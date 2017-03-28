@@ -1,0 +1,51 @@
+name: MNLDiscreteChoiceModel
+
+model_type: discretechoice
+
+choosers_fit_filters: null
+
+choosers_predict_filters: income_quartile == 3
+
+alts_fit_filters: null
+
+alts_predict_filters: null
+
+interaction_predict_filters: null
+
+choice_column: zone_id
+
+sample_size: 50
+
+estimation_sample_size: 1000
+
+prediction_sample_size: null
+
+model_expression:
+- x
+- vacant_residential_units
+- ln_residential_units
+
+fitted: true
+
+choice_mode: aggregate
+
+fit_parameters:
+    Coefficient:
+        ln_residential_units: 1.0235064340153064
+        vacant_residential_units: -3.96214630860101e-05
+        x: 0.22907470531508697
+    Std. Error:
+        ln_residential_units: 0.05524028795465375
+        vacant_residential_units: 3.608604338738673e-05
+        x: 0.004123371419151372
+    T-Score:
+        ln_residential_units: 18.528260295375244
+        vacant_residential_units: -1.0979719405829658
+        x: 55.55519550121746
+
+probability_mode: single_chooser
+
+log_likelihoods:
+    convergence: -3508.22349369402
+    'null': -3912.023005428176
+    ratio: 0.10322012707334771

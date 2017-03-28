@@ -1,0 +1,47 @@
+name: MNLDiscreteChoiceModel
+
+model_type: discretechoice
+
+choosers_fit_filters: null
+
+choosers_predict_filters: all_resunits == 1
+
+alts_fit_filters: null
+
+alts_predict_filters: null
+
+interaction_predict_filters: null
+
+choice_column: zone_id
+
+sample_size: 50
+
+estimation_sample_size: 1000
+
+prediction_sample_size: null
+
+model_expression:
+- avg_residential_value
+- total_household_population
+
+fitted: true
+
+choice_mode: aggregate
+
+fit_parameters:
+    Coefficient:
+        avg_residential_value: 0.0008256926759317403
+        total_household_population: 4.892563509865394e-05
+    Std. Error:
+        avg_residential_value: 0.0002330384519664551
+        total_household_population: 1.813880525911799e-06
+    T-Score:
+        avg_residential_value: 3.5431606628188352
+        total_household_population: 26.972909405959946
+
+probability_mode: single_chooser
+
+log_likelihoods:
+    convergence: -3635.262549770406
+    'null': -3912.023005428176
+    ratio: 0.07074612170576389

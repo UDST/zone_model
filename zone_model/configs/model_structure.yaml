@@ -15,6 +15,8 @@ models:
         alternatives_name: zones
         choosers_fit_filter: null
         segmentation_variable: sector_id
+        supply_variable: job_spaces
+        vacant_variable: vacant_job_spaces
 
     hlcm: 
         model_type: location_choice
@@ -23,18 +25,24 @@ models:
         alternatives_name: zones
         choosers_fit_filter: recent_mover == 1
         segmentation_variable: income_quartile
+        supply_variable: residential_units
+        vacant_variable: vacant_residential_units
 
     rdplcm: 
         model_type: location_choice
         agents_name: residential_units
         alternatives_id_name: zone_id
         alternatives_name: zones
+        supply_variable: ru_spaces
+        vacant_variable: vacant_ru_spaces
 
     nrdplcm: 
         model_type: location_choice
-        agents_name: residential_units
+        agents_name: non_residential_units
         alternatives_id_name: zone_id
         alternatives_name: zones
+        supply_variable: nru_spaces
+        vacant_variable: vacant_nru_spaces
 
     repm_rent:
         model_type: regression
@@ -59,3 +67,18 @@ models:
         fit_filters: [avg_nonres_m2_rent > 0]
         segmentation_variable: all_zones
         var_filter_terms: [value, rent]
+
+
+model_order:
+    - elcm
+    - hlcm
+    - rdplcm
+    - nrdplcm
+
+supporting_steps:
+    elcm: [jobs_transition_basic]
+    hlcm: [households_transition_basic]
+    rdplcm: [residential_unit_vacancy_transition]
+    nrdplcm: [non_residential_unit_vacancy_transition]
+    pre_processing: []
+    post_processing: []

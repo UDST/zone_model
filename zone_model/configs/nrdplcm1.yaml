@@ -1,0 +1,63 @@
+name: MNLDiscreteChoiceModel
+
+model_type: discretechoice
+
+choosers_fit_filters: null
+
+choosers_predict_filters: all_nonresunits == 1
+
+alts_fit_filters: null
+
+alts_predict_filters: null
+
+interaction_predict_filters: null
+
+choice_column: zone_id
+
+sample_size: 50
+
+estimation_sample_size: 1000
+
+prediction_sample_size: null
+
+model_expression:
+- avg_nonres_m2_rent
+- total_household_population
+- travel_time_to_cbd_drive
+- land_km2
+- avg_year_built
+- total_number_of_jobs
+
+fitted: true
+
+choice_mode: aggregate
+
+fit_parameters:
+    Coefficient:
+        avg_nonres_m2_rent: 0.11797719159836775
+        avg_year_built: 0.031714217668638446
+        land_km2: -0.03966661566428334
+        total_household_population: 6.438018882676491e-05
+        total_number_of_jobs: 4.6530681831277104e-05
+        travel_time_to_cbd_drive: 0.07336429282010853
+    Std. Error:
+        avg_nonres_m2_rent: 0.015715390460801393
+        avg_year_built: 0.0001757459732288981
+        land_km2: 0.001225088277091934
+        total_household_population: 2.5017922455953156e-06
+        total_number_of_jobs: 3.287879522449103e-06
+        travel_time_to_cbd_drive: 0.002144384880595071
+    T-Score:
+        avg_nonres_m2_rent: 7.507111700001096
+        avg_year_built: 180.454875215449
+        land_km2: -32.37857745112244
+        total_household_population: 25.733627138749597
+        total_number_of_jobs: 14.152185782226272
+        travel_time_to_cbd_drive: 34.21227853450907
+
+probability_mode: single_chooser
+
+log_likelihoods:
+    convergence: -2442.350159936779
+    'null': -3912.023005428176
+    ratio: 0.3756810334326087

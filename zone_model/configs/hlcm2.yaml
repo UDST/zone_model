@@ -1,0 +1,59 @@
+name: MNLDiscreteChoiceModel
+
+model_type: discretechoice
+
+choosers_fit_filters: null
+
+choosers_predict_filters: income_quartile == 2
+
+alts_fit_filters: null
+
+alts_predict_filters: null
+
+interaction_predict_filters: null
+
+choice_column: zone_id
+
+sample_size: 50
+
+estimation_sample_size: 1000
+
+prediction_sample_size: null
+
+model_expression:
+- avg_residential_value
+- x
+- vacant_residential_units
+- residential_units
+- land_km2
+
+fitted: true
+
+choice_mode: aggregate
+
+fit_parameters:
+    Coefficient:
+        avg_residential_value: -0.001295052133824702
+        land_km2: -0.0023300157450994313
+        residential_units: 0.00014898744126769434
+        vacant_residential_units: -0.00020966251884813665
+        x: -0.7346498519300806
+    Std. Error:
+        avg_residential_value: 0.00042049682546881827
+        land_km2: 0.0005711032739623942
+        residential_units: 7.416603008945336e-06
+        vacant_residential_units: 4.3507027550506075e-05
+        x: 0.0009106740807200799
+    T-Score:
+        avg_residential_value: -3.07981429439052
+        land_km2: -4.0798500924945795
+        residential_units: 20.08836674795687
+        vacant_residential_units: -4.819049488148676
+        x: -806.7099607679456
+
+probability_mode: single_chooser
+
+log_likelihoods:
+    convergence: -3533.2083377589397
+    'null': -3912.023005428176
+    ratio: 0.09683344580121522
