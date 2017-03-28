@@ -12,7 +12,14 @@ utils.register_simple_transition_model('households', .005)
 utils.register_simple_transition_model('residential_units', .005)
 utils.register_simple_transition_model('non_residential_units', .005)
 
-    
+
+# Location Choice
+location_choice_models = orca.get_injectable('location_choice_models')
+for model in location_choice_models:
+    model = location_choice_models[model]
+    utils.register_choice_model_step(model.name, model.choosers)
+
+
 '''
 try:
     from google.cloud import datastore

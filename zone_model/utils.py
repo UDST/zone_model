@@ -10,6 +10,199 @@ from urbansim.models import GrowthRateTransition
 import datasources
 
 
+def default_choices(model, choosers, alternatives):
+    """
+    Simulate choices by just using MNLDiscreteChoiceModel's 
+    predict function.
+    Parameters
+    ----------
+    model : urbansim.models.MNLDiscreteChoiceModel
+        Fitted model object.
+    choosers : pandas.DataFrame
+        DataFrame of choosers.
+    alternatives : pandas.DataFrame
+        DataFrame of alternatives.
+    Returns
+    -------
+    choices : pandas.Series
+        Mapping of chooser ID to alternative ID.
+    """
+    choices = model.predict(choosers, alternatives, debug=True)
+    return choices
+
+
+def random_choices(model, choosers, alternatives):
+    """
+    Simulate choices using random choice, weighted by probability
+    but not capacity constrained.
+    Parameters
+    ----------
+    model : urbansim.models.MNLDiscreteChoiceModel
+        Fitted model object.
+    choosers : pandas.DataFrame
+        DataFrame of choosers.
+    alternatives : pandas.DataFrame
+        DataFrame of alternatives.
+    Returns
+    -------
+    choices : pandas.Series
+        Mapping of chooser ID to alternative ID.
+    """
+    probabilities = calculate_probabilities(model, choosers, alternatives)
+    choices = np.random.choice(
+        probabilities.index, size=len(choosers), replace=True, p=probabilities.values)
+    return pd.Series(choices, index=choosers.index)
+
+
+
+def simulate_choice_model(model, choice_function=default_choices, save_probabilities=False, **kwargs):
+    """
+    Computing choices, with arbitrary function for handling simulation strategy. 
+    Parameters
+    ----------
+    model : urbansim.models.MNLDiscreteChoiceModel
+        Fitted model object.
+    choice_function : function
+        Function defining how to simulate choices based on fitted model.
+        Function must accept the following 3 arguments:  model object, choosers
+        DataFrame, and alternatives DataFrame.  Additional optional keyword
+        args can be utilized by function if needed (kwargs).
+    save_probabilities : bool
+        If true, will save the calculated probabilities underlying the simulation 
+        as an orca injectable with name 'probabilities_modelname_itervar'.
+    Returns
+    -------
+    choices : pandas.Series
+        Mapping of chooser ID to alternative ID. Some choosers
+        will map to a nan value when there are not enough alternatives
+        for all the choosers.
+    """
+    choosers, alternatives = calculate_model_variables(model)
+    
+    # By convention, choosers are denoted by a -1 value in the choice column
+    choosers = choosers[choosers[model.choice_column] == -1]
+    print "%s agents are making a choice." % len(choosers)
+    
+    choices = choice_function(model, choosers, alternatives, **kwargs)
+    
+    if save_probabilities:
+        if not model.sim_pdf:
+            probabilities = calculate_probabilities(model, choosers, alternatives)
+        else:
+            probabilities = model.sim_pdf.reset_index().set_index('alternative_id')[0]
+        orca.add_injectable('probabilities_%s_%s' % (model.name, orca.get_injectable('iter_var')),
+                            probabilities)
+    
+    return choices
+
+
+def calculate_probabilities(model, choosers, alternatives):
+    """
+    Calculate model probabilities.
+    Parameters
+    ----------
+    model : urbansim.models.MNLDiscreteChoiceModel
+        Fitted model object.
+    choosers : pandas.DataFrame
+        DataFrame of choosers.
+    alternatives : pandas.DataFrame
+        DataFrame of alternatives.
+    Returns
+    -------
+    probabilities : pandas.Series
+        Mapping of alternative ID to probabilities.
+    """
+    probabilities = model.probabilities(choosers, alternatives)
+    probabilities = probabilities.reset_index().set_index('alternative_id')[0] # remove chooser_id col from idx
+    return probabilities
+
+
+def calculate_model_variables(model):
+    """
+    Calculate variables needed to simulate the model, and returns DataFrames 
+    of simulation-ready tables with needed variables.
+    Parameters
+    ----------
+    model : urbansim.models.MNLDiscreteChoiceModel
+        Model object with the following attributes:  choice_column, choosers, 
+        alternatives.  Optional attributes are:  supply_variable, vacant_variable.
+    Returns
+    -------
+    choosers : pandas.DataFrame
+        DataFrame of choosers.
+    alternatives : pandas.DataFrame
+        DataFrame of alternatives.
+    """
+    
+    columns_used = model.columns_used() + [model.choice_column]
+    choosers = orca.get_table(model.choosers).to_frame(columns_used)
+    
+    supply_column_names = [col for col in [model.supply_variable, model.vacant_variable] if col is not None]
+    alternatives = orca.get_table(model.alternatives).to_frame(columns_used + list(supply_column_names))
+    return choosers, alternatives
+
+
+def unit_choices(model, choosers, alternatives):
+    """
+    Simulate choices using unit choice.  Alternatives table is expanded
+    to be of length alternatives.vacant_variables, then choices are simulated
+    from among the universe of vacant units, respecting alternative capacity.
+    Parameters
+    ----------
+    model : urbansim.models.MNLDiscreteChoiceModel
+        Fitted model object.
+    choosers : pandas.DataFrame
+        DataFrame of choosers.
+    alternatives : pandas.DataFrame
+        DataFrame of alternatives.
+    Returns
+    -------
+    choices : pandas.Series
+        Mapping of chooser ID to alternative ID.
+    """
+    
+    supply_variable, vacant_variable = model.supply_variable, model.vacant_variable
+    
+    available_units = alternatives[supply_variable]
+    vacant_units = alternatives[vacant_variable]
+    vacant_units = vacant_units[vacant_units.index.values >= 0]  ## must have positive index 
+
+    print "There are %d total available units" % available_units.sum()
+    print "    and %d total choosers" % len(choosers)
+    print "    but there are %d overfull buildings" % \
+          len(vacant_units[vacant_units < 0])
+
+    vacant_units = vacant_units[vacant_units > 0]
+
+    indexes = np.repeat(vacant_units.index.values,
+                        vacant_units.values.astype('int'))
+    isin = pd.Series(indexes).isin(alternatives.index)
+    missing = len(isin[isin == False])
+    indexes = indexes[isin.values]
+    units = alternatives.loc[indexes].reset_index()
+
+    print "    for a total of %d temporarily empty units" % vacant_units.sum()
+    print "    in %d buildings total in the region" % len(vacant_units)
+
+    if missing > 0:
+        print "WARNING: %d indexes aren't found in the locations df -" % \
+            missing
+        print "    this is usually because of a few records that don't join "
+        print "    correctly between the locations df and the aggregations tables"
+
+    print "There are %d total movers for this LCM" % len(choosers)
+    
+    if len(choosers) > vacant_units.sum():
+        print "WARNING: Not enough locations for movers"
+        print "    reducing locations to size of movers for performance gain"
+        choosers = choosers.head(vacant_units.sum())
+        
+    choices = model.predict(choosers, units, debug=True)
+        
+    return pd.Series(units.loc[choices.values][model.choice_column].values,
+                              index=choices.index)
+
+
 def simple_transition(tbl, rate, location_fname, set_year_built=False):
     """
     Run a simple growth rate transition model on the table passed in
@@ -146,3 +339,16 @@ def register_simple_transition_model(agents_name, growth_rate):
         return simple_transition(agents_table, growth_rate, orca.get_injectable('geography_id'))
 
     return simple_transition_model
+
+
+def register_choice_model_step(model_name, agents_name):
+
+    @orca.step(model_name)
+    def choice_model_simulate(location_choice_models):
+        model = location_choice_models[model_name]
+
+        choices = simulate_choice_model(model, choice_function=unit_choices)
+
+        orca.get_table(agents_name).update_col_from_series(model.choice_column, choices)
+        
+    return choice_model_simulate
