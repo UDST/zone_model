@@ -54,7 +54,6 @@ def random_choices(model, choosers, alternatives):
     return pd.Series(choices, index=choosers.index)
 
 
-
 def simulate_choice_model(model, choice_function=default_choices, save_probabilities=False, **kwargs):
     """
     Computing choices, with arbitrary function for handling simulation strategy. 
@@ -133,7 +132,6 @@ def calculate_model_variables(model):
     alternatives : pandas.DataFrame
         DataFrame of alternatives.
     """
-    
     columns_used = model.columns_used() + [model.choice_column]
     choosers = orca.get_table(model.choosers).to_frame(columns_used)
     
@@ -160,7 +158,6 @@ def unit_choices(model, choosers, alternatives):
     choices : pandas.Series
         Mapping of chooser ID to alternative ID.
     """
-    
     supply_variable, vacant_variable = model.supply_variable, model.vacant_variable
     
     available_units = alternatives[supply_variable]

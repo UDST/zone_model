@@ -55,7 +55,7 @@ def year():
 orca.add_injectable("track_changes", False)
 
 
-# Set up location choice models a top-level injectables.  This can also be done manually on a per-model basis
+# Set up location choice models as top-level injectable.  This can also be done manually on a per-model basis
 location_choice_models = {}
 model_configs = orca.get_injectable('yaml_configs')
 for model_category in model_structure['models']:
