@@ -28,6 +28,9 @@ except:
     pass
 
 def get_selected_models_by_version(model_version_id):
+    """
+    Get model configs from Cloud Datastore.
+    """
     query = client.query(kind='Spec')
     query.add_filter('run_id', '=', model_version_id)
     query.add_filter('selected', '=', True)

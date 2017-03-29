@@ -5,7 +5,7 @@ import pandas as pd
 
 import orca
 from urbansim.utils import misc
-from urbansim.models import GrowthRateTransition
+from urbansim.models import GrowthRateTransition, MNLDiscreteChoiceModel
 
 import datasources
 
@@ -52,92 +52,6 @@ def random_choices(model, choosers, alternatives):
     choices = np.random.choice(
         probabilities.index, size=len(choosers), replace=True, p=probabilities.values)
     return pd.Series(choices, index=choosers.index)
-
-
-def simulate_choice_model(model, choice_function=default_choices, save_probabilities=False, **kwargs):
-    """
-    Computing choices, with arbitrary function for handling simulation strategy. 
-    Parameters
-    ----------
-    model : urbansim.models.MNLDiscreteChoiceModel
-        Fitted model object.
-    choice_function : function
-        Function defining how to simulate choices based on fitted model.
-        Function must accept the following 3 arguments:  model object, choosers
-        DataFrame, and alternatives DataFrame.  Additional optional keyword
-        args can be utilized by function if needed (kwargs).
-    save_probabilities : bool
-        If true, will save the calculated probabilities underlying the simulation 
-        as an orca injectable with name 'probabilities_modelname_itervar'.
-    Returns
-    -------
-    choices : pandas.Series
-        Mapping of chooser ID to alternative ID. Some choosers
-        will map to a nan value when there are not enough alternatives
-        for all the choosers.
-    """
-    choosers, alternatives = calculate_model_variables(model)
-    
-    # By convention, choosers are denoted by a -1 value in the choice column
-    choosers = choosers[choosers[model.choice_column] == -1]
-    print "%s agents are making a choice." % len(choosers)
-    
-    choices = choice_function(model, choosers, alternatives, **kwargs)
-    
-    if save_probabilities:
-        if not model.sim_pdf:
-            probabilities = calculate_probabilities(model, choosers, alternatives)
-        else:
-            probabilities = model.sim_pdf.reset_index().set_index('alternative_id')[0]
-        orca.add_injectable('probabilities_%s_%s' % (model.name, orca.get_injectable('iter_var')),
-                            probabilities)
-    
-    return choices
-
-
-def calculate_probabilities(model, choosers, alternatives):
-    """
-    Calculate model probabilities.
-    Parameters
-    ----------
-    model : urbansim.models.MNLDiscreteChoiceModel
-        Fitted model object.
-    choosers : pandas.DataFrame
-        DataFrame of choosers.
-    alternatives : pandas.DataFrame
-        DataFrame of alternatives.
-    Returns
-    -------
-    probabilities : pandas.Series
-        Mapping of alternative ID to probabilities.
-    """
-    probabilities = model.probabilities(choosers, alternatives)
-    probabilities = probabilities.reset_index().set_index('alternative_id')[0] # remove chooser_id col from idx
-    return probabilities
-
-
-def calculate_model_variables(model):
-    """
-    Calculate variables needed to simulate the model, and returns DataFrames 
-    of simulation-ready tables with needed variables.
-    Parameters
-    ----------
-    model : urbansim.models.MNLDiscreteChoiceModel
-        Model object with the following attributes:  choice_column, choosers, 
-        alternatives.  Optional attributes are:  supply_variable, vacant_variable.
-    Returns
-    -------
-    choosers : pandas.DataFrame
-        DataFrame of choosers.
-    alternatives : pandas.DataFrame
-        DataFrame of alternatives.
-    """
-    columns_used = model.columns_used() + [model.choice_column]
-    choosers = orca.get_table(model.choosers).to_frame(columns_used)
-    
-    supply_column_names = [col for col in [model.supply_variable, model.vacant_variable] if col is not None]
-    alternatives = orca.get_table(model.alternatives).to_frame(columns_used + list(supply_column_names))
-    return choosers, alternatives
 
 
 def unit_choices(model, choosers, alternatives):
@@ -344,8 +258,121 @@ def register_choice_model_step(model_name, agents_name):
     def choice_model_simulate(location_choice_models):
         model = location_choice_models[model_name]
 
-        choices = simulate_choice_model(model, choice_function=unit_choices)
+        choices = model.simulate(choice_function=unit_choices)
 
         orca.get_table(agents_name).update_col_from_series(model.choice_column, choices)
         
     return choice_model_simulate
+
+
+class SimulationChoiceModel(MNLDiscreteChoiceModel):
+    """
+    A discrete choice model with parameters needed for simulation.
+    Initialize with MNLDiscreteChoiceModel's init parameters or with from_yaml, 
+    then add simulation parameters with set_simulation_params.
+
+    """
+    def set_simulation_params(self, name, supply_variable, vacant_variable,
+                              choosers, alternatives):
+        """
+        Add simulation parameters as additional attributes.
+        Parameters
+        ----------
+        name : str
+            Name of the model.
+        supply_variable : str
+            The name of the column in the alternatives table indicating number of
+            available spaces, vacant or not, that can be occupied by choosers.
+        vacant_variable : str
+            The name of the column in the alternatives table indicating number of
+            vacant spaces that can be occupied by choosers.
+        choosers : str
+            Name of the choosers table.
+        alternatives : str
+            Name of the alternatives table.
+        Returns
+        -------
+        None
+        """
+        self.name = name
+        self.supply_variable = supply_variable
+        self.vacant_variable = vacant_variable
+        self.choosers = choosers
+        self.alternatives = alternatives
+
+
+    def simulate(self, choice_function=default_choices, save_probabilities=False, **kwargs):
+        """
+        Computing choices, with arbitrary function for handling simulation strategy. 
+        Parameters
+        ----------
+        choice_function : function
+            Function defining how to simulate choices based on fitted model.
+            Function must accept the following 3 arguments:  model object, choosers
+            DataFrame, and alternatives DataFrame.  Additional optional keyword
+            args can be utilized by function if needed (kwargs).
+        save_probabilities : bool
+            If true, will save the calculated probabilities underlying the simulation 
+            as an orca injectable with name 'probabilities_modelname_itervar'.
+        Returns
+        -------
+        choices : pandas.Series
+            Mapping of chooser ID to alternative ID. Some choosers
+            will map to a nan value when there are not enough alternatives
+            for all the choosers.
+        """
+        choosers, alternatives = self.calculate_model_variables()
+        
+        # By convention, choosers are denoted by a -1 value in the choice column
+        choosers = choosers[choosers[self.choice_column] == -1]
+        print "%s agents are making a choice." % len(choosers)
+        
+        choices = choice_function(self, choosers, alternatives, **kwargs)
+        
+        if save_probabilities:
+            if not self.sim_pdf:
+                probabilities = calculate_probabilities(self, choosers, alternatives)
+            else:
+                probabilities = self.sim_pdf.reset_index().set_index('alternative_id')[0]
+            orca.add_injectable('probabilities_%s_%s' % (self.name, orca.get_injectable('iter_var')),
+                                probabilities)
+        
+        return choices
+
+
+    def calculate_probabilities(self, choosers, alternatives):
+        """
+        Calculate model probabilities.
+        Parameters
+        ----------
+        choosers : pandas.DataFrame
+            DataFrame of choosers.
+        alternatives : pandas.DataFrame
+            DataFrame of alternatives.
+        Returns
+        -------
+        probabilities : pandas.Series
+            Mapping of alternative ID to probabilities.
+        """
+        probabilities = self.probabilities(choosers, alternatives)
+        probabilities = probabilities.reset_index().set_index('alternative_id')[0] # remove chooser_id col from idx
+        return probabilities
+
+
+    def calculate_model_variables(self):
+        """
+        Calculate variables needed to simulate the model, and returns DataFrames 
+        of simulation-ready tables with needed variables.
+        Returns
+        -------
+        choosers : pandas.DataFrame
+            DataFrame of choosers.
+        alternatives : pandas.DataFrame
+            DataFrame of alternatives.
+        """
+        columns_used = self.columns_used() + [self.choice_column]
+        choosers = orca.get_table(self.choosers).to_frame(columns_used)
+        
+        supply_column_names = [col for col in [self.supply_variable, self.vacant_variable] if col is not None]
+        alternatives = orca.get_table(self.alternatives).to_frame(columns_used + list(supply_column_names))
+        return choosers, alternatives

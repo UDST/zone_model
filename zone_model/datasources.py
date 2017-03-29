@@ -3,7 +3,6 @@ import pandas as pd
 
 import orca
 from urbansim.utils import misc
-from urbansim.models import MNLDiscreteChoiceModel
 
 import utils
 
@@ -55,31 +54,20 @@ def year():
 orca.add_injectable("track_changes", False)
 
 
-# Set up location choice models as top-level injectable.  This can also be done manually on a per-model basis
+# Set up location choice model objects. Register as injectable to be used throughout simulation
 location_choice_models = {}
-model_configs = orca.get_injectable('yaml_configs')
 for model_category in model_structure['models']:
     model_category_attribs = model_structure['models'][model_category]
-    
     if model_category_attribs['model_type'] == 'location_choice':
-        
-        supply_variable = model_category_attribs['supply_variable']
-        vacant_variable = model_category_attribs['vacant_variable']
-        choosers = model_category_attribs['agents_name']
-        alternatives = model_category_attribs['alternatives_name']
-        
-        yaml_configs = model_configs[model_category]
-        
+        yaml_configs = orca.get_injectable('yaml_configs')[model_category]
         for config in yaml_configs:
             model_name = config.split('.')[0]
-            config_path = misc.config(config)
-            model = MNLDiscreteChoiceModel.from_yaml(str_or_buffer=config_path)
-            
-            model.name = model_name
-            model.supply_variable = supply_variable
-            model.vacant_variable = vacant_variable
-            model.choosers = choosers
-            model.alternatives = alternatives
+            model = utils.SimulationChoiceModel.from_yaml(str_or_buffer=misc.config(config))
+            model.set_simulation_params(model_name, 
+                                        model_category_attribs['supply_variable'],
+                                        model_category_attribs['vacant_variable'],
+                                        model_category_attribs['agents_name'],
+                                        model_category_attribs['alternatives_name'])
             
             location_choice_models[model_name] = model
 
