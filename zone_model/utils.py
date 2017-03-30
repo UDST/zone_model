@@ -16,7 +16,7 @@ def default_choices(model, choosers, alternatives):
     predict function.
     Parameters
     ----------
-    model : urbansim.models.MNLDiscreteChoiceModel
+    model : SimulationChoiceModel
         Fitted model object.
     choosers : pandas.DataFrame
         DataFrame of choosers.
@@ -37,7 +37,7 @@ def random_choices(model, choosers, alternatives):
     but not capacity constrained.
     Parameters
     ----------
-    model : urbansim.models.MNLDiscreteChoiceModel
+    model : SimulationChoiceModel
         Fitted model object.
     choosers : pandas.DataFrame
         DataFrame of choosers.
@@ -48,7 +48,7 @@ def random_choices(model, choosers, alternatives):
     choices : pandas.Series
         Mapping of chooser ID to alternative ID.
     """
-    probabilities = calculate_probabilities(model, choosers, alternatives)
+    probabilities = model.calculate_probabilities(choosers, alternatives)
     choices = np.random.choice(
         probabilities.index, size=len(choosers), replace=True, p=probabilities.values)
     return pd.Series(choices, index=choosers.index)
@@ -61,7 +61,7 @@ def unit_choices(model, choosers, alternatives):
     from among the universe of vacant units, respecting alternative capacity.
     Parameters
     ----------
-    model : urbansim.models.MNLDiscreteChoiceModel
+    model : SimulationChoiceModel
         Fitted model object.
     choosers : pandas.DataFrame
         DataFrame of choosers.
@@ -269,7 +269,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
     """
     A discrete choice model with parameters needed for simulation.
     Initialize with MNLDiscreteChoiceModel's init parameters or with from_yaml, 
-    then add simulation parameters with set_simulation_params.
+    then add simulation parameters with set_simulation_params().
 
     """
     def set_simulation_params(self, name, supply_variable, vacant_variable,
@@ -299,7 +299,6 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         self.vacant_variable = vacant_variable
         self.choosers = choosers
         self.alternatives = alternatives
-
 
     def simulate(self, choice_function=default_choices, save_probabilities=False, **kwargs):
         """
@@ -339,7 +338,6 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         
         return choices
 
-
     def calculate_probabilities(self, choosers, alternatives):
         """
         Calculate model probabilities.
@@ -358,7 +356,6 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         probabilities = probabilities.reset_index().set_index('alternative_id')[0] # remove chooser_id col from idx
         return probabilities
 
-
     def calculate_model_variables(self):
         """
         Calculate variables needed to simulate the model, and returns DataFrames 
@@ -374,5 +371,50 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         choosers = orca.get_table(self.choosers).to_frame(columns_used)
         
         supply_column_names = [col for col in [self.supply_variable, self.vacant_variable] if col is not None]
-        alternatives = orca.get_table(self.alternatives).to_frame(columns_used + list(supply_column_names))
+        alternatives = orca.get_table(self.alternatives).to_frame(columns_used + supply_column_names)
+        return choosers, alternatives
+
+
+class SimpleEnsemble(SimulationChoiceModel):
+    """
+    An ensemble of choice models that allows for simulation with weighted
+    average of component choice models.
+    
+    Parameters
+    ----------
+    model_names : list of str
+        Name of the models that will comprise the ensemble.
+    model_weights : list of float
+        The weight to apply to each of the component models.  Should be the same
+        length as model_names and should sum to 1.
+    """
+    def __init__(self, model_names, model_weights):
+        self.model_names = model_names
+        self.model_weights = model_weights
+
+        location_choice_models = orca.get_injectable('location_choice_models')
+        self.models = [location_choice_models[model] for model in self.model_names]
+        self.choice_column = self.models[0].choice_column
+
+    def calculate_probabilities(self, choosers, alternatives):
+        """
+        Take the weighted average of component model probabilities.
+        """
+        probabilities = np.asarray([model.calculate_probabilities(choosers, alternatives) for model in self.models])
+        avg = np.average(probabilities, axis=0, weights=self.model_weights)
+
+        return pd.Series(data=avg, index=alternatives.index)
+
+    def calculate_model_variables(self):
+        """
+        Calculate all variables needed across component models in ensemble.
+        """
+        first_model = self.models[0]
+
+        variables = [variable for model in self.models for variable in model.columns_used()]
+        columns_used = variables + [self.choice_column]
+        choosers = orca.get_table(first_model.choosers).to_frame(columns_used)
+
+        supply_column_names = [first_model.supply_variable, first_model.vacant_variable]
+        alternatives = orca.get_table(first_model.alternatives).to_frame(columns_used + supply_column_names)
         return choosers, alternatives

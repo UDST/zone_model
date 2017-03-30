@@ -1,5 +1,5 @@
 import orca
-from urbansim.utils import misc
+import numpy as np
 
 import utils
 import datasources
@@ -18,6 +18,18 @@ location_choice_models = orca.get_injectable('location_choice_models')
 for model in location_choice_models:
     model = location_choice_models[model]
     utils.register_choice_model_step(model.name, model.choosers)
+
+
+# Ensemble example- soft voting
+@orca.step('simple_ensemble')
+def simple_hlcm_ensemble(households, location_choice_models):
+    hlcm_models = ['hlcm1', 'hlcm2', 'hlcm3', 'hlcm4']
+    hlcm_weights = [.25, .25, .25, .25]
+
+    model = utils.SimpleEnsemble(hlcm_models, hlcm_weights)
+    choices = model.simulate(choice_function=utils.random_choices)
+
+    households.update_col_from_series('zone_id', choices)
 
 
 '''
