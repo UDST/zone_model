@@ -120,7 +120,7 @@ def zone_ids(zones):
     return zones.index
 
 @orca.column('zones', 'job_spaces', cache=True)
-def job_spaces(zones, jobs):
+def job_spaces(zones):
     return np.round(zones.total_number_of_jobs*1.2)  # Zoning placeholder:  job capacity
 
 @orca.column('zones', 'vacant_job_spaces', cache=False) # The ELCM capacity variable

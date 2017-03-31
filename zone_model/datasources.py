@@ -3,7 +3,6 @@ import pandas as pd
 
 import orca
 from urbansim.utils import misc
-from urbansim.models import MNLDiscreteChoiceModel
 
 import utils
 
@@ -53,3 +52,17 @@ def year():
 
 # Change-sets
 orca.add_injectable("track_changes", False)
+
+
+# Set up location choice model objects. Register as injectable to be used throughout simulation
+location_choice_models = {}
+model_configs = utils.get_model_category_configs()
+for model_category_name, model_category_attributes in model_configs.items():
+    if model_category_attributes['model_type'] == 'location_choice':
+        model_config_files = model_category_attributes['config_filenames']
+
+        for model_config in model_config_files:
+            model = utils.create_lcm_from_config(model_config, model_category_attributes)
+            location_choice_models[model.name] = model
+
+orca.add_injectable('location_choice_models', location_choice_models)
