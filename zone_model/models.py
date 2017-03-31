@@ -16,7 +16,9 @@ utils.register_simple_transition_model('non_residential_units', .005)
 # Location Choice
 location_choice_models = orca.get_injectable('location_choice_models')
 for name, model in location_choice_models.items():
-    utils.register_choice_model_step(model.name, model.choosers, choice_function=utils.unit_choices)
+    utils.register_choice_model_step(model.name,
+                                     model.choosers,
+                                     choice_function=utils.unit_choices)
 
 
 # Ensemble example- soft voting
@@ -51,4 +53,3 @@ def get_selected_models_by_version(model_version_id):
 models_version_id = '70320150328dnh'  ## TODO: pull this into config file
 models = get_selected_models_by_version(models_version_id)
 '''
-
