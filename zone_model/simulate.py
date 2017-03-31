@@ -1,8 +1,8 @@
 import orca
 
-import datasources
-import variables
-import models
+from zone_model import datasources
+from zone_model import variables
+from zone_model import models
 
 transition_models = ['simple_jobs_transition',
                      'simple_households_transition',

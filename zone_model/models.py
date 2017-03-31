@@ -1,9 +1,9 @@
 import orca
 import numpy as np
 
-import utils
-import datasources
-import variables
+from zone_model import utils
+from zone_model import datasources
+from zone_model import variables
 
 
 # Transition

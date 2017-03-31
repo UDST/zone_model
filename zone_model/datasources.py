@@ -4,7 +4,7 @@ import pandas as pd
 import orca
 from urbansim.utils import misc
 
-import utils
+from zone_model import utils
 
 
 @orca.injectable('store', cache=True)

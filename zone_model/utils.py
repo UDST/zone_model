@@ -7,7 +7,7 @@ import orca
 from urbansim.utils import misc
 from urbansim.models import GrowthRateTransition, MNLDiscreteChoiceModel
 
-import datasources
+from zone_model import datasources
 
 
 def random_choices(model, choosers, alternatives):

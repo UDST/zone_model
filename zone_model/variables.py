@@ -5,7 +5,7 @@ import orca
 from urbansim.utils import misc
 from variable_generators import generators
 
-import datasources
+from zone_model import datasources
 geography_base_id = orca.get_injectable('geography_id')
 
 #####################
