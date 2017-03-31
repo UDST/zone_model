@@ -1,0 +1,31 @@
+language: python
+sudo: false
+python:
+- '2.7'
+- '3.5'
+
+install:
+- if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh
+  -O miniconda.sh; else wget http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+  -O miniconda.sh; fi
+- bash miniconda.sh -b -p $HOME/miniconda
+- export PATH="$HOME/miniconda/bin:$PATH"
+- hash -r
+- conda config --set always_yes yes --set changeps1 no
+- conda update -q conda
+- conda info -a
+- |
+  conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION pip numpy pandas pytest matplotlib scipy statsmodels pyyaml
+- source activate test-environment
+- conda list
+# UPDATE THESE WHEN LATEST VERSIONS PUSHED TO PIP
+- pip install https://github.com/UDST/orca/archive/master.zip
+- pip install https://github.com/pksohn/urbansim/archive/python3.zip
+- cd .. && git clone -b python3 git@github.com:urbansim/variable_generators.git
+- cd variable_generators && pip install .
+- cd $TRAVIS_BUILD_DIR && pip install .
+- cd zone_model/data && curl -O https://storage.googleapis.com/urbansim/zone_model/model_data.h5
+- cd $TRAVIS_BUILD_DIR/zone_model
+
+script:
+- python simulate.py
