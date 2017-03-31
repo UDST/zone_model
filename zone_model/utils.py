@@ -9,8 +9,6 @@ from urbansim.utils import misc
 from urbansim.models import GrowthRateTransition
 from urbansim.models import MNLDiscreteChoiceModel
 
-# from zone_model import datasources
-
 
 def random_choices(model, choosers, alternatives):
     """
