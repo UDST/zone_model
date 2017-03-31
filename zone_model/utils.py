@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os
 import yaml
 import numpy as np
@@ -5,9 +6,10 @@ import pandas as pd
 
 import orca
 from urbansim.utils import misc
-from urbansim.models import GrowthRateTransition, MNLDiscreteChoiceModel
+from urbansim.models import GrowthRateTransition
+from urbansim.models import MNLDiscreteChoiceModel
 
-from zone_model import datasources
+# from zone_model import datasources
 
 
 def random_choices(model, choosers, alternatives):
@@ -60,10 +62,12 @@ def unit_choices(model, choosers, alternatives):
     # must have positive index
     vacant_units = vacant_units[vacant_units.index.values >= 0]
 
-    print "There are {} total available units".format(available_units.sum())
-    print "    and {} total choosers".format(len(choosers))
-    print "    but there are {} overfull alternatives".format(
-        len(vacant_units[vacant_units < 0]))
+    print("There are {} total available units"
+          .format(available_units.sum()),
+          "    and {} total choosers"
+          .format(len(choosers)),
+          "    but there are {} overfull alternatives"
+          .format(len(vacant_units[vacant_units < 0])))
 
     vacant_units = vacant_units[vacant_units > 0]
 
@@ -74,24 +78,24 @@ def unit_choices(model, choosers, alternatives):
     indexes = indexes[isin.values]
     units = alternatives.loc[indexes].reset_index()
 
-    print "    for a total of {} temporarily empty units".format(
-        vacant_units.sum())
-    print "    in {} alternatives total in the region".format(
-        len(vacant_units))
+    print("    for a total of {} temporarily empty units"
+          .format(vacant_units.sum()),
+          "    in {} alternatives total in the region"
+          .format(len(vacant_units)))
 
     if missing > 0:
-        print (
-            "WARNING: {} indexes aren't found in the locations df -".format(
-                missing),
+        print(
+            "WARNING: {} indexes aren't found in the locations df -"
+            .format(missing),
             "    this is usually because of a few records that don't join ",
             "    correctly between the locations df and the aggregations",
             "tables")
 
-    print "There are {} total movers for this LCM".format(len(choosers))
+    print("There are {} total movers for this LCM".format(len(choosers)))
 
     if len(choosers) > vacant_units.sum():
-        print "WARNING: Not enough locations for movers"
-        print "    reducing locations to size of movers for performance gain"
+        print("WARNING: Not enough locations for movers",
+              "reducing locations to size of movers for performance gain")
         choosers = choosers.head(vacant_units.sum())
 
     choices = model.predict(choosers, units, debug=True)
@@ -121,9 +125,9 @@ def simple_transition(tbl, rate, location_fname, set_year_built=False):
     transition = GrowthRateTransition(rate)
     df_base = tbl.to_frame(tbl.local_columns)
 
-    print "%d agents before transition" % len(df_base.index)
+    print("{} agents before transition".format(len(df_base.index)))
     df, added, copied, removed = transition.transition(df_base, None)
-    print "%d agents after transition" % len(df.index)
+    print("{} agents after transition".format(len(df.index)))
 
     # Change tracking
     record_change_sets('added', (tbl.name, added))
@@ -236,8 +240,8 @@ def register_simple_transition_model(agents_name, growth_rate):
     @orca.step('simple_%s_transition' % agents_name)
     def simple_transition_model():
         agents_table = orca.get_table(agents_name)
-        print 'Running {} transition with {:.2f} percent growth rate'.format(
-            agents_name, growth_rate*100.0)
+        print('Running {} transition with {:.2f} percent growth rate'
+              .format(agents_name, growth_rate * 100.0))
         return simple_transition(agents_table, growth_rate,
                                  orca.get_injectable('geography_id'))
 
@@ -252,12 +256,11 @@ def register_choice_model_step(model_name, agents_name, choice_function):
 
         choices = model.simulate(choice_function=choice_function)
 
-        print 'There are {} unplaced agents.'.format(choices.isnull().sum())
+        print('There are {} unplaced agents.'
+              .format(choices.isnull().sum()))
 
         orca.get_table(agents_name).update_col_from_series(
-            model.choice_column,
-            choices,
-            cast=True)
+            model.choice_column, choices, cast=True)
 
     return choice_model_simulate
 
@@ -326,7 +329,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         # By convention, choosers are denoted by a -1 value
         # in the choice column
         choosers = choosers[choosers[self.choice_column] == -1]
-        print "{} agents are making a choice.".format(len(choosers))
+        print("{} agents are making a choice.".format(len(choosers)))
 
         if choice_function:
             choices = choice_function(self, choosers, alternatives, **kwargs)

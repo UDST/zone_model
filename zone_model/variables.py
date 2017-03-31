@@ -267,7 +267,7 @@ def make_agg_var(agent, geog, geog_id, var_to_aggregate, agg_function):
     @orca.column(geog, var_name, cache=True, cache_scope='iteration')
     def func():
         agents = orca.get_table(agent)
-        print 'Calculating {} of {} for {}'.format(var_name, agent, geog)
+        print('Calculating {} of {} for {}'.format(var_name, agent, geog))
 
         groupby = agents[var_to_aggregate].groupby(agents[geog_id])
         if agg_function == 'mean':
@@ -304,9 +304,8 @@ def make_disagg_var(from_geog_name, to_geog_name, var_to_disaggregate,
 
     @orca.column(to_geog_name, var_name, cache=True, cache_scope='iteration')
     def func():
-        print 'Disaggregating {} to {} from {}'.format(var_to_disaggregate,
-                                                       to_geog_name,
-                                                       from_geog_name)
+        print('Disaggregating {} to {} from {}'
+              .format(var_to_disaggregate, to_geog_name, from_geog_name))
 
         from_geog = orca.get_table(from_geog_name)
         to_geog = orca.get_table(to_geog_name)
@@ -329,9 +328,8 @@ def make_disagg_var(from_geog_name, to_geog_name, var_to_disaggregate,
 
     @orca.column(to_geog_name, var_name, cache=True, cache_scope='iteration')
     def func():
-        print 'Disaggregating {} to {} from {}'.format(var_to_disaggregate,
-                                                       to_geog_name,
-                                                       from_geog_name)
+        print('Disaggregating {} to {} from {}'
+              .format(var_to_disaggregate, to_geog_name, from_geog_name))
 
         from_geog = orca.get_table(from_geog_name)
         to_geog = orca.get_table(to_geog_name)
@@ -351,7 +349,7 @@ def make_size_var(agent, geog, geog_id):
     @orca.column(geog, var_name, cache=True, cache_scope='iteration')
     def func():
         agents = orca.get_table(agent)
-        print 'Calculating number of {} for {}'.format(agent, geog)
+        print('Calculating number of {} for {}'.format(agent, geog))
 
         size = agents[geog_id].value_counts()
 
@@ -375,9 +373,8 @@ def make_proportion_var(agent, geog, geog_id, target_variable, target_value):
         agents = orca.get_table(agent).to_frame(
             columns=[target_variable, geog_id])
         locations = orca.get_table(geog)
-        print 'Calculating proportion {} {} for {}'.format(target_variable,
-                                                           target_value,
-                                                           geog)
+        print('Calculating proportion {} {} for {}'
+              .format(target_variable, target_value, geog))
 
         agent_subset = agents[agents[target_variable] == target_value]
         series = (agent_subset.groupby(geog_id).size()
@@ -412,8 +409,8 @@ def make_ratio_var(agent1, agent2, geog):
     @orca.column(geog, var_name, cache=True, cache_scope='iteration')
     def func():
         locations = orca.get_table(geog)
-        print 'Calculating ratio of {} to {} for {}'.format(agent1, agent2,
-                                                            geog)
+        print('Calculating ratio of {} to {} for {}'
+              .format(agent1, agent2, geog))
 
         series = (locations['total_' + agent1] * 1.0
                   / (locations['total_' + agent2] + 1.0))
@@ -432,7 +429,7 @@ def make_density_var(agent, geog):
     @orca.column(geog, var_name, cache=True, cache_scope='iteration')
     def func():
         locations = orca.get_table(geog)
-        print 'Calculating density of {} for {}'.format(agent, geog)
+        print('Calculating density of {} for {}'.format(agent, geog))
         if geog != 'zones':
             series = (locations['total_' + agent] * 1.0
                       / (locations['sum_acres'] + 1.0))

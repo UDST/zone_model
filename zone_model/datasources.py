@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import os
 import pandas as pd
 
@@ -29,8 +31,8 @@ geography_id = model_structure['geography_id']
 orca.add_injectable("template", template)
 orca.add_injectable("geography", geography)
 orca.add_injectable("geography_id", geography_id)
-print 'Model template is: %s. Operating on %s with %s.' % (
-    template, geography, geography_id)
+print('Model template is: {}. Operating on {} with {}.'
+      .format(template, geography, geography_id))
 
 # Tables from data-store
 for table in [geography, 'jobs', 'households', 'residential_units',
