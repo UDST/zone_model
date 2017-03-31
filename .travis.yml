@@ -15,7 +15,7 @@ install:
 - conda update -q conda
 - conda info -a
 - |
-  conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION pip numpy pandas pytest matplotlib scipy statsmodels pyyaml
+  conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION pip numpy pandas pytest matplotlib scipy statsmodels pyyaml pycodestyle
 - source activate test-environment
 - conda list
 # UPDATE THESE WHEN LATEST VERSIONS PUSHED TO PIP
@@ -28,4 +28,5 @@ install:
 - cd $TRAVIS_BUILD_DIR/zone_model
 
 script:
+- pycodestyle .
 - python simulate.py
