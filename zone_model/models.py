@@ -15,15 +15,15 @@ utils.register_simple_transition_model('non_residential_units', .005)
 
 # Location Choice
 location_choice_models = orca.get_injectable('location_choice_models')
-for model in location_choice_models:
-    model = location_choice_models[model]
-    utils.register_choice_model_step(model.name, model.choosers)
+for name, model in location_choice_models.items():
+    utils.register_choice_model_step(model.name, model.choosers, choice_function=utils.unit_choices)
 
 
 # Ensemble example- soft voting
 @orca.step('simple_ensemble')
 def simple_hlcm_ensemble(households, location_choice_models):
-    hlcm_models = ['hlcm1', 'hlcm2', 'hlcm3', 'hlcm4']
+    model_names = ['hlcm1', 'hlcm2', 'hlcm3', 'hlcm4']
+    hlcm_models = [location_choice_models[model] for model in model_names]
     hlcm_weights = [.25, .25, .25, .25]
 
     model = utils.SimpleEnsemble(hlcm_models, hlcm_weights)

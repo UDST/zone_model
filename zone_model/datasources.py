@@ -56,19 +56,13 @@ orca.add_injectable("track_changes", False)
 
 # Set up location choice model objects. Register as injectable to be used throughout simulation
 location_choice_models = {}
-for model_category in model_structure['models']:
-    model_category_attribs = model_structure['models'][model_category]
-    if model_category_attribs['model_type'] == 'location_choice':
-        yaml_configs = orca.get_injectable('yaml_configs')[model_category]
-        for config in yaml_configs:
-            model_name = config.split('.')[0]
-            model = utils.SimulationChoiceModel.from_yaml(str_or_buffer=misc.config(config))
-            model.set_simulation_params(model_name, 
-                                        model_category_attribs['supply_variable'],
-                                        model_category_attribs['vacant_variable'],
-                                        model_category_attribs['agents_name'],
-                                        model_category_attribs['alternatives_name'])
-            
-            location_choice_models[model_name] = model
+model_configs = utils.get_model_category_configs()
+for model_category_name, model_category_attributes in model_configs.items():
+    if model_category_attributes['model_type'] == 'location_choice':
+        model_config_files = model_category_attributes['config_filenames']
+
+        for model_config in model_config_files:
+            model = utils.create_lcm_from_config(model_config, model_category_attributes)
+            location_choice_models[model.name] = model
 
 orca.add_injectable('location_choice_models', location_choice_models)

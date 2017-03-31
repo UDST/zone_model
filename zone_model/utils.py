@@ -10,27 +10,6 @@ from urbansim.models import GrowthRateTransition, MNLDiscreteChoiceModel
 import datasources
 
 
-def default_choices(model, choosers, alternatives):
-    """
-    Simulate choices by just using MNLDiscreteChoiceModel's 
-    predict function.
-    Parameters
-    ----------
-    model : SimulationChoiceModel
-        Fitted model object.
-    choosers : pandas.DataFrame
-        DataFrame of choosers.
-    alternatives : pandas.DataFrame
-        DataFrame of alternatives.
-    Returns
-    -------
-    choices : pandas.Series
-        Mapping of chooser ID to alternative ID.
-    """
-    choices = model.predict(choosers, alternatives, debug=True)
-    return choices
-
-
 def random_choices(model, choosers, alternatives):
     """
     Simulate choices using random choice, weighted by probability
@@ -80,7 +59,7 @@ def unit_choices(model, choosers, alternatives):
 
     print "There are %d total available units" % available_units.sum()
     print "    and %d total choosers" % len(choosers)
-    print "    but there are %d overfull buildings" % \
+    print "    but there are %d overfull alternatives" % \
           len(vacant_units[vacant_units < 0])
 
     vacant_units = vacant_units[vacant_units > 0]
@@ -93,7 +72,7 @@ def unit_choices(model, choosers, alternatives):
     units = alternatives.loc[indexes].reset_index()
 
     print "    for a total of %d temporarily empty units" % vacant_units.sum()
-    print "    in %d buildings total in the region" % len(vacant_units)
+    print "    in %d alternatives total in the region" % len(vacant_units)
 
     if missing > 0:
         print "WARNING: %d indexes aren't found in the locations df -" % \
@@ -252,16 +231,18 @@ def register_simple_transition_model(agents_name, growth_rate):
     return simple_transition_model
 
 
-def register_choice_model_step(model_name, agents_name):
+def register_choice_model_step(model_name, agents_name, choice_function):
 
     @orca.step(model_name)
     def choice_model_simulate(location_choice_models):
         model = location_choice_models[model_name]
 
-        choices = model.simulate(choice_function=unit_choices)
+        choices = model.simulate(choice_function=choice_function)
 
-        orca.get_table(agents_name).update_col_from_series(model.choice_column, choices)
-        
+        print 'There are %s unplaced agents.' % choices.isnull().sum()
+
+        orca.get_table(agents_name).update_col_from_series(model.choice_column, choices, cast=True)
+
     return choice_model_simulate
 
 
@@ -300,7 +281,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         self.choosers = choosers
         self.alternatives = alternatives
 
-    def simulate(self, choice_function=default_choices, save_probabilities=False, **kwargs):
+    def simulate(self, choice_function=None, save_probabilities=False, **kwargs):
         """
         Computing choices, with arbitrary function for handling simulation strategy. 
         Parameters
@@ -325,12 +306,15 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         # By convention, choosers are denoted by a -1 value in the choice column
         choosers = choosers[choosers[self.choice_column] == -1]
         print "%s agents are making a choice." % len(choosers)
-        
-        choices = choice_function(self, choosers, alternatives, **kwargs)
+
+        if choice_function:
+            choices = choice_function(self, choosers, alternatives, **kwargs)
+        else:
+            choices = self.predict(choosers, alternatives, debug=True)
         
         if save_probabilities:
             if not self.sim_pdf:
-                probabilities = calculate_probabilities(self, choosers, alternatives)
+                probabilities = self.calculate_probabilities(self, choosers, alternatives)
             else:
                 probabilities = self.sim_pdf.reset_index().set_index('alternative_id')[0]
             orca.add_injectable('probabilities_%s_%s' % (self.name, orca.get_injectable('iter_var')),
@@ -388,12 +372,9 @@ class SimpleEnsemble(SimulationChoiceModel):
         The weight to apply to each of the component models.  Should be the same
         length as model_names and should sum to 1.
     """
-    def __init__(self, model_names, model_weights):
-        self.model_names = model_names
+    def __init__(self, models, model_weights):
+        self.models = models
         self.model_weights = model_weights
-
-        location_choice_models = orca.get_injectable('location_choice_models')
-        self.models = [location_choice_models[model] for model in self.model_names]
         self.choice_column = self.models[0].choice_column
 
     def calculate_probabilities(self, choosers, alternatives):
@@ -418,3 +399,32 @@ class SimpleEnsemble(SimulationChoiceModel):
         supply_column_names = [first_model.supply_variable, first_model.vacant_variable]
         alternatives = orca.get_table(first_model.alternatives).to_frame(columns_used + supply_column_names)
         return choosers, alternatives
+
+
+def get_model_category_configs():
+    """
+    Returns dictionary where key is model category name and value is dictionary 
+    of model category attributes, including individual model config filename(s).
+    """
+    yaml_configs = orca.get_injectable('yaml_configs')
+    model_category_configs = orca.get_injectable('model_structure')['models']
+
+    for model_category, category_attributes in model_category_configs.items():
+        category_attributes['config_filenames'] = yaml_configs[model_category]
+
+    return model_category_configs
+
+
+def create_lcm_from_config(config_filename, model_attributes):
+    """
+    For a given model config filename and dictionary of model category attributes,
+    instantiate a SimulationChoiceModel object.
+    """
+    model_name = config_filename.split('.')[0]
+    model = SimulationChoiceModel.from_yaml(str_or_buffer=misc.config(config_filename))
+    model.set_simulation_params(model_name,
+                                model_attributes['supply_variable'],
+                                model_attributes['vacant_variable'],
+                                model_attributes['agents_name'],
+                                model_attributes['alternatives_name'])
+    return model

@@ -32,6 +32,7 @@ setup(
         'numpy >= 1.1.0',
         'pandas >= 0.16.0',
         'orca >= 1.3.0',
-        'urbansim >= 0.1.1', 'yaml',
+        'urbansim >= 0.1.1',
+        'pyyaml'
     ]
 )
