@@ -21,7 +21,7 @@ install:
 # UPDATE THESE WHEN LATEST VERSIONS PUSHED TO PIP
 - pip install https://github.com/UDST/orca/archive/master.zip
 - pip install https://github.com/pksohn/urbansim/archive/python3.zip
-- cd .. && git clone -b python3 git@github.com:urbansim/variable_generators.git
+- cd .. && git clone git@github.com:urbansim/variable_generators.git
 - cd variable_generators && pip install .
 - cd $TRAVIS_BUILD_DIR && pip install .
 - cd zone_model/data && curl -O https://storage.googleapis.com/urbansim/zone_model/model_data.h5
