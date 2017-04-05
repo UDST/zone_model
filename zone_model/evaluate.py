@@ -1,6 +1,5 @@
 from __future__ import print_function
 
-import numpy as np
 import pandas as pd
 from sklearn.metrics import r2_score
 from sklearn.metrics import mean_squared_error
@@ -10,7 +9,6 @@ import orca
 from zone_model import datasources
 from zone_model import variables
 from zone_model import models
-from zone_model import utils
 
 
 def correlate(observed, predicted):
