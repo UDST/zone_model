@@ -394,7 +394,8 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         return choosers, alternatives
 
     def score(self, scoring_function=accuracy_score, choosers=None,
-              alternatives=None, aggregate=False, apply_filter=True):
+              alternatives=None, aggregate=False, apply_filter=True,
+              choice_function=random_choices):
         """
         Calculate score for model.  Defaults to accuracy score, but other
         scoring functions can be provided.  Computed on all choosers/
@@ -418,6 +419,8 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
             Whether to apply the model's choosers_predict_filters prior to
             calculating score.  If supplying own test dataset, and do not want
             it further manipulated, then set to False.
+        choice_function : function, option
+            Function defining how to simulate choices.
         Returns
         -------
         score : float
@@ -430,7 +433,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
             choosers = choosers.query(self.choosers_predict_filters)
 
         observed_choices = choosers[self.choice_column]
-        predicted_choices = random_choices(self, choosers, alternatives)
+        predicted_choices = choice_function(self, choosers, alternatives)
 
         if self.summary_alts_xref is not None:
             observed_choices = observed_choices.map(self.summary_alts_xref)
