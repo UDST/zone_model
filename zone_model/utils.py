@@ -3,6 +3,8 @@ import os
 import yaml
 import numpy as np
 import pandas as pd
+from sklearn.metrics import accuracy_score
+
 
 import orca
 from urbansim.utils import misc
@@ -271,7 +273,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
 
     """
     def set_simulation_params(self, name, supply_variable, vacant_variable,
-                              choosers, alternatives):
+                              choosers, alternatives, summary_alts_xref=None):
         """
         Add simulation parameters as additional attributes.
         Parameters
@@ -289,6 +291,9 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
             Name of the choosers table.
         alternatives : str
             Name of the alternatives table.
+        summary_alts_xref : dict or pd.Series, optional
+            Mapping of alternative index to summary alternative id.  For use
+            in evaluating a model with many alternatives.
         Returns
         -------
         None
@@ -298,6 +303,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         self.vacant_variable = vacant_variable
         self.choosers = choosers
         self.alternatives = alternatives
+        self.summary_alts_xref = summary_alts_xref
 
     def simulate(self, choice_function=None, save_probabilities=False,
                  **kwargs):
@@ -386,6 +392,58 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         alternatives = orca.get_table(self.alternatives).to_frame(
             columns_used + supply_column_names)
         return choosers, alternatives
+
+    def score(self, scoring_function=accuracy_score, choosers=None,
+              alternatives=None, aggregate=False, apply_filter=True,
+              choice_function=random_choices):
+        """
+        Calculate score for model.  Defaults to accuracy score, but other
+        scoring functions can be provided.  Computed on all choosers/
+        alternatives by default, but can also be computed on user-supplied
+        test datasets.  If model has a summary_alts_xref, then score
+        calculated after mapping to summary ids.
+        Parameters
+        ----------
+        scoring_function : function, default sklearn.metrics.accuracy_score
+            Function defining how to score model predictions. Function must
+            accept the following 2 arguments:  pd.Series of observed choices,
+            pd.Series of predicted choices.
+        choosers : pandas.DataFrame, optional
+            DataFrame of choosers.
+        alternatives : pandas.DataFrame, optional
+            DataFrame of alternatives.
+        aggregate : bool
+            Whether to calculate score based on total count of choosers that
+            made each choice, rather than based on disaggregate choices.
+        apply_filter : bool
+            Whether to apply the model's choosers_predict_filters prior to
+            calculating score.  If supplying own test dataset, and do not want
+            it further manipulated, then set to False.
+        choice_function : function, option
+            Function defining how to simulate choices.
+        Returns
+        -------
+        score : float
+            The model's score (accuracy score by default).
+        """
+        if choosers is None or alternatives is None:
+            choosers, alternatives = self.calculate_model_variables()
+
+        if apply_filter:
+            choosers = choosers.query(self.choosers_predict_filters)
+
+        observed_choices = choosers[self.choice_column]
+        predicted_choices = choice_function(self, choosers, alternatives)
+
+        if self.summary_alts_xref is not None:
+            observed_choices = observed_choices.map(self.summary_alts_xref)
+            predicted_choices = predicted_choices.map(self.summary_alts_xref)
+
+        if aggregate:
+            observed_choices = observed_choices.value_counts()
+            predicted_choices = predicted_choices.value_counts()
+
+        return scoring_function(observed_choices, predicted_choices)
 
 
 class SimpleEnsemble(SimulationChoiceModel):
