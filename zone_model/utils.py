@@ -469,9 +469,9 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         if choosers is None or alternatives is None:
             choosers, alternatives = self.calculate_model_variables()
 
-        alternatives_plus = alternatives.append(alternative_data, 
+        alternatives_plus = alternatives.append(alternative_data,
                                                 ignore_index=True)
-        probabilities = self.calculate_probabilities(choosers, 
+        probabilities = self.calculate_probabilities(choosers,
                                                      alternatives_plus)
 
         probability = probabilities.iloc[-1]
@@ -481,9 +481,9 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
     def relative_probabilities(self, low_percentile=.05, high_percentile=.95,
                                choosers=None, alternatives=None):
         """
-        Indicator of explanatory variable influence.  For each variable, 
-        calculate relative variable probability contribution by holding all 
-        other variables at their median value and having the variable of 
+        Indicator of explanatory variable influence.  For each variable,
+        calculate relative variable probability contribution by holding all
+        other variables at their median value and having the variable of
         interest take on its 5th and 95th percentile values, then calculating
         the difference in resulting probabilities.
         Parameters
@@ -501,7 +501,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         Returns
         -------
         relative_probabilities : dict
-            Mapping between variable name and it's contribution to 
+            Mapping between variable name and it's contribution to
             probability.
         """
         if choosers is None or alternatives is None:
@@ -524,16 +524,16 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
             mock_observation = alternatives[constant_vars].median()
 
             mock_observation[var_to_measure] = high_percentile_value
-            high_proba = self.single_alternative_proba(mock_observation, 
+            high_proba = self.single_alternative_proba(mock_observation,
                                                        choosers, alternatives)
 
             mock_observation[var_to_measure] = low_percentile_value
-            low_proba = self.single_alternative_proba(mock_observation, 
+            low_proba = self.single_alternative_proba(mock_observation,
                                                       choosers, alternatives)
 
             proba_difference = high_proba - low_proba
             relative_probabilities[var_to_measure] = proba_difference
-            
+
         return relative_probabilities
 
 

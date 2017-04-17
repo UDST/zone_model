@@ -39,4 +39,3 @@ for model_name, model in location_choice_models.items():
     relative_probabilities = pd.Series(model.relative_probabilities())
     print("  Variables by probability influence:")
     print(relative_probabilities.sort_values(ascending=False))
-    
