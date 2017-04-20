@@ -1,4 +1,4 @@
-name: MNLDiscreteChoiceModel
+name: hlcm1
 
 model_type: discretechoice
 
@@ -24,28 +24,34 @@ model_expression:
 - avg_residential_value
 - y
 - ln_residential_units
+- income:avg_residential_value
 
 fitted: true
 
-choice_mode: aggregate
-
 fit_parameters:
     Coefficient:
-        avg_residential_value: -0.0017985572558068797
-        ln_residential_units: 1.1454876550005044
-        y: -0.6522619831771769
+        avg_residential_value: -0.0016559982670882052
+        income:avg_residential_value: 1.297031103635955e-08
+        ln_residential_units: 1.028779788603458
+        y: -0.5325805832635901
     Std. Error:
-        avg_residential_value: 0.0004227497021857127
-        ln_residential_units: 0.044573867688738375
-        y: 0.012411679216790393
+        avg_residential_value: 0.0004597649467484601
+        income:avg_residential_value: 1.8260533712401253e-09
+        ln_residential_units: 0.047372630385468156
+        y: 0.013232655882909354
     T-Score:
-        avg_residential_value: -4.254425837577004
-        ln_residential_units: 25.69863721495976
-        y: -52.55227530331299
+        avg_residential_value: -3.60183671852263
+        income:avg_residential_value: 7.102920013532266
+        ln_residential_units: 21.716754595055004
+        y: -40.24744450216112
 
-probability_mode: single_chooser
+probability_mode: full_product
+
+choice_mode: individual
+
+prediction_sample_size: 1000
 
 log_likelihoods:
-    convergence: -3397.310749172847
+    convergence: -3463.6068928305353
     'null': -3912.023005428176
-    ratio: 0.13157188890278348
+    ratio: 0.11462512157403859
