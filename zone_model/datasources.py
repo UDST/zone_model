@@ -70,3 +70,11 @@ for model_category_name, model_category_attributes in model_configs.items():
             location_choice_models[model.name] = model
 
 orca.add_injectable('location_choice_models', location_choice_models)
+
+
+@orca.injectable("change_sets")
+def change_sets():
+    change_sets = {}
+    return change_sets
+
+orca.add_injectable("track_changes", True)

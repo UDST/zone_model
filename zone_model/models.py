@@ -12,6 +12,9 @@ utils.register_simple_transition_model('households', .005)
 utils.register_simple_transition_model('residential_units', .005)
 utils.register_simple_transition_model('non_residential_units', .005)
 
+# Relocation
+utils.register_simple_relocation_model('jobs', .01)
+utils.register_simple_relocation_model('households', .01)
 
 # Location Choice
 location_choice_models = orca.get_injectable('location_choice_models')
