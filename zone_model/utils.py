@@ -233,7 +233,7 @@ def record_change_sets(change_type, change):
 
 class ChangeSet(object):
     def __init__(self, data, operation, table, column=None):
-        self.data = data
+        self.data = data if operation is 'updated' else data.to_series()
         self.operation = operation
         self.table = table
         self.column = column
@@ -242,8 +242,23 @@ class ChangeSet(object):
         self.model_step = orca.get_injectable('iter_step').step_name
         self.created = datetime.datetime.now()
 
-    def __call__(self, driver):
-        pass
+    def export(self):
+        if len(self.data) > 0:
+            payload = self.data.to_msgpack(compress='zlib')
+            publish_message('changeset123abc', payload)
+        else:
+            return None
+
+from google.cloud import pubsub
+
+def publish_message(topic_name, data):
+    """Publishes a message to a Pub/Sub topic with the given data."""
+    pubsub_client = pubsub.Client()
+    topic = pubsub_client.topic(topic_name)
+
+    message_id = topic.publish(data)
+
+    print('Message {} published.'.format(message_id))
 
 
 def register_table_from_store(table_name):
