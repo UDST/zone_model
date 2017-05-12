@@ -159,14 +159,14 @@ def simple_transition(tbl, rate, location_fname, set_year_built=False):
     df, added, copied, removed = transition.transition(df_base, None)
     print("{} agents after transition".format(len(df.index)))
 
-    # Change tracking
-    record_change_sets('added', {'table':tbl.name, 'data':copied})
-    record_change_sets('removed', {'table':tbl.name, 'data':removed})
-
     df.loc[added, location_fname] = -1
 
     if set_year_built:
         df.loc[added, 'year_built'] = orca.get_injectable('year')
+
+    # Change tracking
+    record_change_sets('added', {'table':tbl.name, 'data':df.loc[added]})
+    record_change_sets('removed', {'table':tbl.name, 'data':removed.to_series()})
 
     orca.add_table(tbl.name, df)
 
@@ -233,7 +233,7 @@ def record_change_sets(change_type, change):
 
 class ChangeSet(object):
     def __init__(self, data, operation, table, column=None):
-        self.data = data if operation is 'updated' else data.to_series()
+        self.data = data
         self.operation = operation
         self.table = table
         self.column = column
@@ -245,18 +245,21 @@ class ChangeSet(object):
     def export(self):
         if len(self.data) > 0:
             payload = self.data.to_msgpack(compress='zlib')
-            publish_message('changeset123abc', payload)
+            publish_message('changeset123abc', payload, 
+                            operation=self.operation, table=self.table, 
+                            column=self.column, year=self.year,
+                            step=self.model_step, created=self.created)
         else:
             return None
 
 from google.cloud import pubsub
 
-def publish_message(topic_name, data):
+def publish_message(topic_name, data, **kwargs):
     """Publishes a message to a Pub/Sub topic with the given data."""
     pubsub_client = pubsub.Client()
     topic = pubsub_client.topic(topic_name)
-
-    message_id = topic.publish(data)
+    kwargs = {k: unicode(v) for k, v in kwargs.items()}
+    message_id = topic.publish(data, **kwargs)
 
     print('Message {} published.'.format(message_id))
 
