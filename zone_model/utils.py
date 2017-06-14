@@ -302,7 +302,8 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
 
     """
     def set_simulation_params(self, name, supply_variable, vacant_variable,
-                              choosers, alternatives, summary_alts_xref=None):
+                              choosers, alternatives, summary_alts_xref=None,
+                              merge_tables=None):
         """
         Add simulation parameters as additional attributes.
         Parameters
@@ -323,6 +324,9 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         summary_alts_xref : dict or pd.Series, optional
             Mapping of alternative index to summary alternative id.  For use
             in evaluating a model with many alternatives.
+        merge_tables : list of str, optional
+            List of additional tables to be broadcast onto the alternatives
+            table.
         Returns
         -------
         None
@@ -333,6 +337,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         self.choosers = choosers
         self.alternatives = alternatives
         self.summary_alts_xref = summary_alts_xref
+        self.merge_tables = merge_tables
 
     def simulate(self, choice_function=None, save_probabilities=False,
                  **kwargs):
@@ -418,8 +423,20 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         supply_column_names = [col for col in
                                [self.supply_variable, self.vacant_variable]
                                if col is not None]
-        alternatives = orca.get_table(self.alternatives).to_frame(
-            columns_used + supply_column_names)
+        if self.merge_tables:
+            import copy
+            mt = copy.deepcopy(self.merge_tables)
+            mt.append(self.alternatives)
+            all_cols = []
+            for table in mt:
+                all_cols.extend(orca.get_table(table).columns)
+            all_cols = [col for col in all_cols if col in self.columns_used()]
+            mt.append(self.alternatives)
+            alternatives = orca.merge_tables(target=self.alternatives,
+                               tables=mt, columns=all_cols)
+        else:
+            alternatives = orca.get_table(self.alternatives).to_frame(
+                columns_used + supply_column_names)
         return choosers, alternatives
 
     def score(self, scoring_function=accuracy_score, choosers=None,
@@ -548,5 +565,6 @@ def create_lcm_from_config(config_filename, model_attributes):
                                 model_attributes['supply_variable'],
                                 model_attributes['vacant_variable'],
                                 model_attributes['agents_name'],
-                                model_attributes['alternatives_name'])
+                                model_attributes['alternatives_name'],
+                                merge_tables=model_attributes['merge_tables'])
     return model
