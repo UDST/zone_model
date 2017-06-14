@@ -431,7 +431,6 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
             for table in mt:
                 all_cols.extend(orca.get_table(table).columns)
             all_cols = [col for col in all_cols if col in self.columns_used()]
-            mt.append(self.alternatives)
             alternatives = orca.merge_tables(target=self.alternatives,
                                tables=mt, columns=all_cols)
         else:
