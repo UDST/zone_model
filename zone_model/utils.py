@@ -561,10 +561,12 @@ def create_lcm_from_config(config_filename, model_attributes):
     model_name = config_filename.split('.')[0]
     model = SimulationChoiceModel.from_yaml(
         str_or_buffer=misc.config(config_filename))
+    merge_tables = model_attributes['merge_tables'] \
+                    if 'merge_tables' in model_attributes else None
     model.set_simulation_params(model_name,
                                 model_attributes['supply_variable'],
                                 model_attributes['vacant_variable'],
                                 model_attributes['agents_name'],
                                 model_attributes['alternatives_name'],
-                                merge_tables=model_attributes['merge_tables'])
+                                merge_tables=merge_tables)
     return model
