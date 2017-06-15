@@ -302,8 +302,8 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
 
     """
     def set_simulation_params(self, name, supply_variable, vacant_variable,
-                              choosers, alternatives, choice_column, summary_alts_xref=None,
-                              merge_tables=None):
+                              choosers, alternatives, choice_column=None,
+                              summary_alts_xref=None, merge_tables=None):
         """
         Add simulation parameters as additional attributes.
         Parameters
@@ -338,9 +338,8 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         self.alternatives = alternatives
         self.summary_alts_xref = summary_alts_xref
         self.merge_tables = merge_tables
-        self.choice_column = choice_column if self.choice_column == None \
-                             else self.choice_column
-        
+        self.choice_column = choice_column if choice_column is not None \
+            and self.choice_column is None else self.choice_column
 
     def simulate(self, choice_function=None, save_probabilities=False,
                  **kwargs):
@@ -390,7 +389,6 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
 
         return choices
 
-
     def fit_model(self):
         """
         Estimate model based on existing parameters
@@ -401,7 +399,6 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         choosers, alternatives = self.calculate_model_variables()
         self.fit(choosers, alternatives, choosers[self.choice_column])
         print(self.fit_parameters)
-
 
     def calculate_probabilities(self, choosers, alternatives):
         """
@@ -448,7 +445,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
                 all_cols.extend(orca.get_table(table).columns)
             all_cols = [col for col in all_cols if col in self.columns_used()]
             alternatives = orca.merge_tables(target=self.alternatives,
-                               tables=mt, columns=all_cols)
+                                             tables=mt, columns=all_cols)
         else:
             alternatives = orca.get_table(self.alternatives).to_frame(
                 columns_used + supply_column_names)
@@ -577,15 +574,15 @@ def create_lcm_from_config(config_filename, model_attributes):
     model = SimulationChoiceModel.from_yaml(
         str_or_buffer=misc.config(config_filename))
     merge_tables = model_attributes['merge_tables'] \
-                    if 'merge_tables' in model_attributes else None
+        if 'merge_tables' in model_attributes else None
     choice_column = model_attributes['alternatives_id_name'] \
-                    if model.choice_column == None and 'alternatives_id_name' \
-                    in model_attributes else None
+        if model.choice_column is None and 'alternatives_id_name' \
+        in model_attributes else None
     model.set_simulation_params(model_name,
                                 model_attributes['supply_variable'],
                                 model_attributes['vacant_variable'],
                                 model_attributes['agents_name'],
                                 model_attributes['alternatives_name'],
-                                choice_column,
+                                choice_column=choice_column,
                                 merge_tables=merge_tables)
     return model
