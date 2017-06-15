@@ -302,7 +302,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
 
     """
     def set_simulation_params(self, name, supply_variable, vacant_variable,
-                              choosers, alternatives, summary_alts_xref=None,
+                              choosers, alternatives, choice_column, summary_alts_xref=None,
                               merge_tables=None):
         """
         Add simulation parameters as additional attributes.
@@ -338,6 +338,9 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         self.alternatives = alternatives
         self.summary_alts_xref = summary_alts_xref
         self.merge_tables = merge_tables
+        self.choice_column = choice_column if self.choice_column == None \
+                             else self.choice_column
+        
 
     def simulate(self, choice_function=None, save_probabilities=False,
                  **kwargs):
@@ -386,6 +389,19 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
                 probabilities)
 
         return choices
+
+
+    def fit_model(self):
+        """
+        Estimate model based on existing parameters
+        Returns
+        -------
+        None
+        """
+        choosers, alternatives = self.calculate_model_variables()
+        self.fit(choosers, alternatives, choosers[self.choice_column])
+        print(self.fit_parameters)
+
 
     def calculate_probabilities(self, choosers, alternatives):
         """
@@ -562,10 +578,14 @@ def create_lcm_from_config(config_filename, model_attributes):
         str_or_buffer=misc.config(config_filename))
     merge_tables = model_attributes['merge_tables'] \
                     if 'merge_tables' in model_attributes else None
+    choice_column = model_attributes['alternatives_id_name'] \
+                    if model.choice_column == None and 'alternatives_id_name' \
+                    in model_attributes else None
     model.set_simulation_params(model_name,
                                 model_attributes['supply_variable'],
                                 model_attributes['vacant_variable'],
                                 model_attributes['agents_name'],
                                 model_attributes['alternatives_name'],
+                                choice_column,
                                 merge_tables=merge_tables)
     return model
