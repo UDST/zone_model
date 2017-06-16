@@ -339,7 +339,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         self.summary_alts_xref = summary_alts_xref
         self.merge_tables = merge_tables
         self.choice_column = choice_column if choice_column is not None \
-            and self.choice_column is None else self.choice_column
+            else self.choice_column
 
     def simulate(self, choice_function=None, save_probabilities=False,
                  **kwargs):
@@ -398,7 +398,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         """
         choosers, alternatives = self.calculate_model_variables()
         self.fit(choosers, alternatives, choosers[self.choice_column])
-        print(self.fit_parameters)
+        return self.log_likelihoods, self.fit_parameters
 
     def calculate_probabilities(self, choosers, alternatives):
         """
