@@ -133,6 +133,85 @@ def unit_choices(model, choosers, alternatives):
                      index=choices.index)
 
 
+def lottery_choices_agent_units(model, choosers, alternatives, max_iter=15):
+    """
+    Simulate choices using lottery choices.  Alternatives are selected iteratively
+    with agent_units respecting capacities until all agents are placed, capacity
+    is zero, or max iterations is reached.
+    Parameters
+    ----------
+    model : SimulationChoiceModel
+        Fitted model object.
+    choosers : pandas.DataFrame
+        DataFrame of choosers.
+    alternatives : pandas.DataFrame
+        DataFrame of alternatives.
+    Returns
+    -------
+    choices : pandas.Series
+        Mapping of chooser ID to alternative ID.
+    """
+
+    supply_variable, vacant_variable, agent_units = (model.supply_variable,
+                                                     model.vacant_variable,
+                                                     model.agent_units)
+
+    available_units = alternatives[supply_variable]
+    vacant_units = alternatives[vacant_variable]
+
+    print("There are {} total available units"
+          .format(available_units.sum()),
+          "and {} total choosers"
+          .format(len(choosers)),
+          "but there are {} overfull alternatives"
+          .format(len(vacant_units[vacant_units < 0])))
+
+    choices = model.predict(choosers, alternatives)
+    choosers['new_choice_id'] = choices
+    unit_check = (vacant_units - 
+                  choosers.groupby('new_choice_id')[agent_units].sum())
+    over = unit_check[unit_check < 0]
+    iteration = 2
+
+    while (len(over) > 0) & (iteration <= max_iter):
+        iteration += 1
+        choose_again = np.array([])
+        for ialt in over.index:
+            idx = choosers.index[choosers.new_choice_id == ialt]
+            units = choosers.employees[choosers.new_choice_id == ialt]
+            capacity = alternatives[vacant_variable][alternatives.index==ialt]
+            permutate = np.random.permutation(idx.size)
+            csum = units[idx[permutate]].cumsum()
+            draw = idx[permutate[np.where(csum > capacity[ialt])]]
+            choose_again = np.concatenate((choose_again, draw))
+        chosen = choosers.loc[~choosers.index.isin(choose_again)]
+        still_choosing = choosers.loc[choosers.index.isin(choose_again)]
+        chosen_sum = chosen.groupby('new_choice_id')[agent_units].sum()    
+        unit_check = pd.DataFrame(data={'vac':vacant_units,'chosen_sum':chosen_sum})
+        unit_check['new_vacancy'] = (unit_check.vac - unit_check.chosen_sum).fillna(unit_check.vac)
+
+        full = unit_check.index[unit_check.new_vacancy <= 1]
+        full = unit_check[unit_check <= 1]
+        alternatives = alternatives[~alternatives.index.isin(full)]
+        choices = model.predict(still_choosing, alternatives)
+        choosers.loc[choosers.index.isin(choices.index), 'new_choice_id'] = choices
+        unit_check = (vacant_units - 
+                      choosers.groupby('new_choice_id').employees.sum())
+        over = unit_check[unit_check < 0]
+    print("Placed {} {} with {} {} in {} iterations"
+          .format(len(chosen), model.choosers,
+                  chosen[agent_units].sum(), agent_units,
+                  iteration-1))
+    print("{} unplaced {} remain with {} {}"
+          .format(len(over), model.choosers,
+                  int(choosers.loc[choosers.index.isin(over.index),
+                  [agent_units]].sum()), agent_units))
+
+    choosers.loc[choosers.index.isin(over.index), 'new_choice_id'] = -1
+    return choosers.new_choice_id
+
+
+
 def simple_transition(tbl, rate, location_fname, set_year_built=False):
     """
     Run a simple growth rate transition model on the table passed in
@@ -303,7 +382,8 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
     """
     def set_simulation_params(self, name, supply_variable, vacant_variable,
                               choosers, alternatives, choice_column=None,
-                              summary_alts_xref=None, merge_tables=None):
+                              summary_alts_xref=None, merge_tables=None,
+                              agent_units=None):
         """
         Add simulation parameters as additional attributes.
         Parameters
@@ -338,6 +418,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         self.alternatives = alternatives
         self.summary_alts_xref = summary_alts_xref
         self.merge_tables = merge_tables
+        self.agent_units = agent_units
         self.choice_column = choice_column if choice_column is not None \
             else self.choice_column
 
@@ -365,6 +446,9 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
             for all the choosers.
         """
         choosers, alternatives = self.calculate_model_variables()
+        
+        choosers, alternatives = self.apply_predict_filters(
+                                 choosers, alternatives)
 
         # By convention, choosers are denoted by a -1 value
         # in the choice column
@@ -436,6 +520,9 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         supply_column_names = [col for col in
                                [self.supply_variable, self.vacant_variable]
                                if col is not None]
+
+        columns_used.extend(supply_column_names)
+                               
         if self.merge_tables:
             import copy
             mt = copy.deepcopy(self.merge_tables)
@@ -443,7 +530,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
             all_cols = []
             for table in mt:
                 all_cols.extend(orca.get_table(table).columns)
-            all_cols = [col for col in all_cols if col in self.columns_used()]
+            all_cols = [col for col in all_cols if col in columns_used]
             alternatives = orca.merge_tables(target=self.alternatives,
                                              tables=mt, columns=all_cols)
         else:
@@ -575,6 +662,8 @@ def create_lcm_from_config(config_filename, model_attributes):
         str_or_buffer=misc.config(config_filename))
     merge_tables = model_attributes['merge_tables'] \
         if 'merge_tables' in model_attributes else None
+    agent_units = model_attributes['agent_units'] \
+        if 'agent_units' in model_attributes else None
     choice_column = model_attributes['alternatives_id_name'] \
         if model.choice_column is None and 'alternatives_id_name' \
         in model_attributes else None
@@ -584,5 +673,6 @@ def create_lcm_from_config(config_filename, model_attributes):
                                 model_attributes['agents_name'],
                                 model_attributes['alternatives_name'],
                                 choice_column=choice_column,
-                                merge_tables=merge_tables)
+                                merge_tables=merge_tables,
+                                agent_units=agent_units)
     return model
