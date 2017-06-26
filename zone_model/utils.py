@@ -135,9 +135,9 @@ def unit_choices(model, choosers, alternatives):
 
 def lottery_choices_agent_units(model, choosers, alternatives, max_iter=15):
     """
-    Simulate choices using lottery choices.  Alternatives are selected iteratively
-    with agent_units respecting capacities until all agents are placed, capacity
-    is zero, or max iterations is reached.
+    Simulate choices using lottery choices.  Alternatives are selected
+    iteratively with agent_units respecting capacities until all agents
+    are placed, capacity is zero, or max iterations is reached.
     Parameters
     ----------
     model : SimulationChoiceModel
@@ -168,7 +168,7 @@ def lottery_choices_agent_units(model, choosers, alternatives, max_iter=15):
 
     choices = model.predict(choosers, alternatives)
     choosers['new_choice_id'] = choices
-    unit_check = (vacant_units - 
+    unit_check = (vacant_units -
                   choosers.groupby('new_choice_id')[agent_units].sum())
     over = unit_check[unit_check < 0]
     iteration = 2
@@ -179,23 +179,27 @@ def lottery_choices_agent_units(model, choosers, alternatives, max_iter=15):
         for ialt in over.index:
             idx = choosers.index[choosers.new_choice_id == ialt]
             units = choosers.employees[choosers.new_choice_id == ialt]
-            capacity = alternatives[vacant_variable][alternatives.index==ialt]
+            cap = alternatives[vacant_variable][alternatives.index == ialt]
             permutate = np.random.permutation(idx.size)
             csum = units[idx[permutate]].cumsum()
-            draw = idx[permutate[np.where(csum > capacity[ialt])]]
+            draw = idx[permutate[np.where(csum > cap[ialt])]]
             choose_again = np.concatenate((choose_again, draw))
         chosen = choosers.loc[~choosers.index.isin(choose_again)]
         still_choosing = choosers.loc[choosers.index.isin(choose_again)]
-        chosen_sum = chosen.groupby('new_choice_id')[agent_units].sum()    
-        unit_check = pd.DataFrame(data={'vac':vacant_units,'chosen_sum':chosen_sum})
-        unit_check['new_vacancy'] = (unit_check.vac - unit_check.chosen_sum).fillna(unit_check.vac)
+        chosen_sum = chosen.groupby('new_choice_id')[agent_units].sum()
+        unit_check = pd.DataFrame(data={'vac': vacant_units,
+                                        'chosen_sum': chosen_sum})
+        unit_check['new_vacancy'] = (unit_check.vac -
+                                     unit_check.chosen_sum).fillna(
+                                     unit_check.vac)
 
         full = unit_check.index[unit_check.new_vacancy <= 1]
         full = unit_check[unit_check <= 1]
         alternatives = alternatives[~alternatives.index.isin(full)]
         choices = model.predict(still_choosing, alternatives)
-        choosers.loc[choosers.index.isin(choices.index), 'new_choice_id'] = choices
-        unit_check = (vacant_units - 
+        choosers.loc[choosers.index.isin(choices.index),
+                     'new_choice_id'] = choices
+        unit_check = (vacant_units -
                       choosers.groupby('new_choice_id').employees.sum())
         over = unit_check[unit_check < 0]
     print("Placed {} {} with {} {} in {} iterations"
@@ -205,11 +209,10 @@ def lottery_choices_agent_units(model, choosers, alternatives, max_iter=15):
     print("{} unplaced {} remain with {} {}"
           .format(len(over), model.choosers,
                   int(choosers.loc[choosers.index.isin(over.index),
-                  [agent_units]].sum()), agent_units))
+                                   [agent_units]].sum()), agent_units))
 
     choosers.loc[choosers.index.isin(over.index), 'new_choice_id'] = -1
     return choosers.new_choice_id
-
 
 
 def simple_transition(tbl, rate, location_fname, set_year_built=False):
@@ -446,7 +449,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
             for all the choosers.
         """
         choosers, alternatives = self.calculate_model_variables()
-        
+
         choosers, alternatives = self.apply_predict_filters(
                                  choosers, alternatives)
 
@@ -522,7 +525,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
                                if col is not None]
 
         columns_used.extend(supply_column_names)
-                               
+
         if self.merge_tables:
             import copy
             mt = copy.deepcopy(self.merge_tables)
