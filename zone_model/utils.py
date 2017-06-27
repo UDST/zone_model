@@ -168,12 +168,13 @@ def lottery_choices_agent_units(model, choosers, alternatives, max_iter=15):
 
     choices = model.predict(choosers, alternatives)
     choosers['new_choice_id'] = choices
+
     def vacancy_check(vacant_units, choosers, agent_units):
         unit_check = (vacant_units -
                       choosers.groupby('new_choice_id')[agent_units].sum())
         over = unit_check[unit_check < 0]
         return unit_check, over
-        
+
     unit_check, over = vacancy_check(vacant_units, choosers, agent_units)
     iteration = 2
 
@@ -211,7 +212,7 @@ def lottery_choices_agent_units(model, choosers, alternatives, max_iter=15):
         print("{} unplaced {} remain with {} {}"
               .format(len(over), model.choosers,
                       int(choosers.loc[choosers.index.isin(over.index),
-                                   [agent_units]].sum()), agent_units))
+                                       [agent_units]].sum()), agent_units))
 
     choosers.loc[choosers.index.isin(over.index), 'new_choice_id'] = -1
     return choosers.new_choice_id
