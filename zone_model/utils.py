@@ -8,7 +8,7 @@ from sklearn.metrics import accuracy_score
 
 import orca
 from urbansim.utils import misc
-from urbansim.models import GrowthRateTransition
+from urbansim.models import GrowthRateTransition, transition
 from urbansim.models import MNLDiscreteChoiceModel
 
 
@@ -253,6 +253,124 @@ def simple_transition(tbl, rate, location_fname, set_year_built=False):
         df.loc[added, 'year_built'] = orca.get_injectable('year')
 
     orca.add_table(tbl.name, df)
+
+
+def full_transition(agents, agent_controls, totals_column, year,
+                    location_fname, linked_tables=None,
+                    accounting_column=None, set_year_built=False):
+    """
+    Run a transition model based on control totals specified in the usual
+    UrbanSim way
+
+    Parameters
+    ----------
+    agents : DataFrameWrapper
+        Table to be transitioned
+    agent_controls : DataFrameWrapper
+        Table of control totals
+    totals_column : str
+        String indicating the agent_controls column to use for totals.
+    year : int
+        The year, which will index into the controls
+    settings : dict
+        Contains the configuration for the transition model - is specified
+        down to the yaml level with a "total_column" which specifies the
+        control total and an "add_columns" param which specified which
+        columns to add when calling to_frame (should be a list of the columns
+        needed to do the transition
+    location_fname : str
+        The field name in the resulting dataframe to set to -1 (to unplace
+        new agents)
+    linked_tables : dict, optional
+        Sets the tables linked to new or removed agents to be updated with
+        dict of {'table_name':(DataFrameWrapper, 'link_id')}
+    accounting_column : str, optional
+        Name of column with accounting totals/quantities to apply toward the
+        control. If not provided then row counts will be used for accounting.
+    set_year_built: boolean
+        Indicates whether to update 'year_built' columns with current
+        simulation year
+
+    Returns
+    -------
+    Nothing
+    """
+    ct = agent_controls.to_frame()
+    agnt = agents.to_frame(agents.local_columns)
+    print("Total agents before transition: {}".format(len(agnt)))
+    tran = transition.TabularTotalsTransition(ct, totals_column, accounting_column)
+    updated, added, copied, removed = tran.transition(agnt, year)
+    updated.loc[added, location_fname] = -1
+    if set_year_built:
+        updated.loc[added, 'year_built'] = year
+    
+    updated_links = {}
+    if linked_tables:
+        for table_name, (table, col) in linked_tables.iteritems():
+            logger.debug('updating linked table {}'.format(table_name))
+            updated_links[table_name] = \
+                    update_linked_table(table, col, added, copied, removed)
+            orca.add_table(table_name, updated_links[table_name])
+    
+    print("Total agents after transition: {}".format(len(updated)))
+    orca.add_table(agents.name, updated[agents.local_columns])
+
+
+def update_linked_table(tbl, col_name, added, copied, removed):
+    """
+    Copy and update rows in a table that has a column referencing another
+    table that has had rows added via copying.
+
+    Parameters
+    ----------
+    tbl : DataFrameWrapper
+        Table to update with new or removed rows.
+    col_name : str
+        Name of column in `table` that corresponds to the index values
+        in `copied` and `removed`.
+    added : pandas.Index
+        Indexes of rows that are new in the linked table.
+    copied : pandas.Index
+        Indexes of rows that were copied to make new rows in linked table.
+    removed : pandas.Index
+        Indexes of rows that were removed from the linked table.
+
+    Returns
+    -------
+    updated : pandas.DataFrame
+
+    """
+    logger.debug('start: update linked table after transition')
+
+    # handle removals
+    table = tbl.local
+    table = table.loc[~table[col_name].isin(set(removed))]
+    removed = table.loc[table[col_name].isin(set(removed))]
+    if (added is None or len(added) == 0):
+        return table
+
+    # map new IDs to the IDs from which they were copied
+    id_map = pd.concat([pd.Series(copied, name=col_name),
+                        pd.Series(added, name='temp_id')], axis=1)
+
+    # join to linked table and assign new id
+    new_rows = id_map.merge(table, on=col_name)
+    new_rows.drop(col_name, axis=1, inplace=True)
+    new_rows.rename(columns={'temp_id': col_name}, inplace=True)
+
+    # index the new rows
+    starting_index = table.index.values.max() + 1
+    new_rows.index = np.arange(starting_index,
+                               starting_index + len(new_rows), dtype=np.int)
+    
+    if orca.get_injectable('track_changes'):
+        add_data = (tbl.name, added)
+        record_change_sets("added", add_data)
+        remove_data = (tbl.name, removed.index)
+        record_change_sets("removed", remove_data)
+
+    logger.debug('finish: update linked table after transition')
+    return pd.concat([table, new_rows])
 
 
 def record_change_sets(change_type, change_data):
