@@ -168,9 +168,13 @@ def lottery_choices_agent_units(model, choosers, alternatives, max_iter=15):
 
     choices = model.predict(choosers, alternatives)
     choosers['new_choice_id'] = choices
-    unit_check = (vacant_units -
-                  choosers.groupby('new_choice_id')[agent_units].sum())
-    over = unit_check[unit_check < 0]
+    def vacancy_check(vacant_units, choosers, agent_units):
+        unit_check = (vacant_units -
+                      choosers.groupby('new_choice_id')[agent_units].sum())
+        over = unit_check[unit_check < 0]
+        return unit_check, over
+        
+    unit_check, over = vacancy_check(vacant_units, choosers, agent_units)
     iteration = 2
 
     while (len(over) > 0) & (iteration <= max_iter):
@@ -178,7 +182,7 @@ def lottery_choices_agent_units(model, choosers, alternatives, max_iter=15):
         choose_again = np.array([])
         for ialt in over.index:
             idx = choosers.index[choosers.new_choice_id == ialt]
-            units = choosers.employees[choosers.new_choice_id == ialt]
+            units = choosers[agent_units][choosers.new_choice_id == ialt]
             cap = alternatives[vacant_variable][alternatives.index == ialt]
             permutate = np.random.permutation(idx.size)
             csum = units[idx[permutate]].cumsum()
@@ -194,21 +198,19 @@ def lottery_choices_agent_units(model, choosers, alternatives, max_iter=15):
                                      unit_check.vac)
 
         full = unit_check.index[unit_check.new_vacancy <= 1]
-        full = unit_check[unit_check <= 1]
         alternatives = alternatives[~alternatives.index.isin(full)]
         choices = model.predict(still_choosing, alternatives)
         choosers.loc[choosers.index.isin(choices.index),
                      'new_choice_id'] = choices
-        unit_check = (vacant_units -
-                      choosers.groupby('new_choice_id').employees.sum())
-        over = unit_check[unit_check < 0]
-    print("Placed {} {} with {} {} in {} iterations"
-          .format(len(chosen), model.choosers,
-                  chosen[agent_units].sum(), agent_units,
-                  iteration-1))
-    print("{} unplaced {} remain with {} {}"
-          .format(len(over), model.choosers,
-                  int(choosers.loc[choosers.index.isin(over.index),
+        unit_check, over = vacancy_check(vacant_units, choosers, agent_units)
+    if len(choosers) > 0:
+        print("Placed {} {} with {} {} in {} iterations"
+              .format(len(chosen), model.choosers,
+                      chosen[agent_units].sum(), agent_units,
+                      iteration-1))
+        print("{} unplaced {} remain with {} {}"
+              .format(len(over), model.choosers,
+                      int(choosers.loc[choosers.index.isin(over.index),
                                    [agent_units]].sum()), agent_units))
 
     choosers.loc[choosers.index.isin(over.index), 'new_choice_id'] = -1
@@ -410,6 +412,9 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         merge_tables : list of str, optional
             List of additional tables to be broadcast onto the alternatives
             table.
+        agent_units : str, optional
+            Name of the column in the choosers table that designates how
+            much supply is occupied by each chooser.
         Returns
         -------
         None
