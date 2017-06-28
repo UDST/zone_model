@@ -8,7 +8,7 @@ from sklearn.metrics import accuracy_score
 
 import orca
 from urbansim.utils import misc
-from urbansim.models import GrowthRateTransition
+from urbansim.models import GrowthRateTransition, transition
 from urbansim.models import MNLDiscreteChoiceModel
 
 
@@ -133,6 +133,91 @@ def unit_choices(model, choosers, alternatives):
                      index=choices.index)
 
 
+def lottery_choices_agent_units(model, choosers, alternatives, max_iter=15):
+    """
+    Simulate choices using lottery choices.  Alternatives are selected
+    iteratively with agent_units respecting capacities until all agents
+    are placed, capacity is zero, or max iterations is reached.
+    Parameters
+    ----------
+    model : SimulationChoiceModel
+        Fitted model object.
+    choosers : pandas.DataFrame
+        DataFrame of choosers.
+    alternatives : pandas.DataFrame
+        DataFrame of alternatives.
+    Returns
+    -------
+    choices : pandas.Series
+        Mapping of chooser ID to alternative ID.
+    """
+
+    supply_variable, vacant_variable, agent_units = (model.supply_variable,
+                                                     model.vacant_variable,
+                                                     model.agent_units)
+
+    available_units = alternatives[supply_variable]
+    vacant_units = alternatives[vacant_variable]
+
+    print("There are {} total available units"
+          .format(available_units.sum()),
+          "and {} total choosers"
+          .format(len(choosers)),
+          "but there are {} overfull alternatives"
+          .format(len(vacant_units[vacant_units < 0])))
+
+    choices = model.predict(choosers, alternatives)
+    choosers['new_choice_id'] = choices
+
+    def vacancy_check(vacant_units, choosers, agent_units):
+        unit_check = (vacant_units -
+                      choosers.groupby('new_choice_id')[agent_units].sum())
+        over = unit_check[unit_check < 0]
+        return unit_check, over
+
+    unit_check, over = vacancy_check(vacant_units, choosers, agent_units)
+    iteration = 2
+
+    while (len(over) > 0) & (iteration <= max_iter):
+        iteration += 1
+        choose_again = np.array([])
+        for ialt in over.index:
+            idx = choosers.index[choosers.new_choice_id == ialt]
+            units = choosers[agent_units][choosers.new_choice_id == ialt]
+            cap = alternatives[vacant_variable][alternatives.index == ialt]
+            permutate = np.random.permutation(idx.size)
+            csum = units[idx[permutate]].cumsum()
+            draw = idx[permutate[np.where(csum > cap[ialt])]]
+            choose_again = np.concatenate((choose_again, draw))
+        chosen = choosers.loc[~choosers.index.isin(choose_again)]
+        still_choosing = choosers.loc[choosers.index.isin(choose_again)]
+        chosen_sum = chosen.groupby('new_choice_id')[agent_units].sum()
+        unit_check = pd.DataFrame(data={'vac': vacant_units,
+                                        'chosen_sum': chosen_sum})
+        unit_check['new_vacancy'] = (unit_check.vac -
+                                     unit_check.chosen_sum).fillna(
+                                     unit_check.vac)
+
+        full = unit_check.index[unit_check.new_vacancy <= 1]
+        alternatives = alternatives[~alternatives.index.isin(full)]
+        choices = model.predict(still_choosing, alternatives)
+        choosers.loc[choosers.index.isin(choices.index),
+                     'new_choice_id'] = choices
+        unit_check, over = vacancy_check(vacant_units, choosers, agent_units)
+    if len(choosers) > 0:
+        print("Placed {} {} with {} {} in {} iterations"
+              .format(len(chosen), model.choosers,
+                      chosen[agent_units].sum(), agent_units,
+                      iteration-1))
+        print("{} unplaced {} remain with {} {}"
+              .format(len(over), model.choosers,
+                      int(choosers.loc[choosers.index.isin(over.index),
+                                       [agent_units]].sum()), agent_units))
+
+    choosers.loc[choosers.index.isin(over.index), 'new_choice_id'] = -1
+    return choosers.new_choice_id
+
+
 def simple_transition(tbl, rate, location_fname, set_year_built=False):
     """
     Run a simple growth rate transition model on the table passed in
@@ -168,6 +253,125 @@ def simple_transition(tbl, rate, location_fname, set_year_built=False):
         df.loc[added, 'year_built'] = orca.get_injectable('year')
 
     orca.add_table(tbl.name, df)
+
+
+def full_transition(agents, agent_controls, totals_column, year,
+                    location_fname, linked_tables=None,
+                    accounting_column=None, set_year_built=False):
+    """
+    Run a transition model based on control totals specified in the usual
+    UrbanSim way
+
+    Parameters
+    ----------
+    agents : DataFrameWrapper
+        Table to be transitioned
+    agent_controls : DataFrameWrapper
+        Table of control totals
+    totals_column : str
+        String indicating the agent_controls column to use for totals.
+    year : int
+        The year, which will index into the controls
+    settings : dict
+        Contains the configuration for the transition model - is specified
+        down to the yaml level with a "total_column" which specifies the
+        control total and an "add_columns" param which specified which
+        columns to add when calling to_frame (should be a list of the columns
+        needed to do the transition
+    location_fname : str
+        The field name in the resulting dataframe to set to -1 (to unplace
+        new agents)
+    linked_tables : dict, optional
+        Sets the tables linked to new or removed agents to be updated with
+        dict of {'table_name':(DataFrameWrapper, 'link_id')}
+    accounting_column : str, optional
+        Name of column with accounting totals/quantities to apply toward the
+        control. If not provided then row counts will be used for accounting.
+    set_year_built: boolean
+        Indicates whether to update 'year_built' columns with current
+        simulation year
+
+    Returns
+    -------
+    Nothing
+    """
+    ct = agent_controls.to_frame()
+    agnt = agents.to_frame(agents.local_columns)
+    print("Total agents before transition: {}".format(len(agnt)))
+    tran = transition.TabularTotalsTransition(ct, totals_column,
+                                              accounting_column)
+    updated, added, copied, removed = tran.transition(agnt, year)
+    updated.loc[added, location_fname] = -1
+    if set_year_built:
+        updated.loc[added, 'year_built'] = year
+
+    updated_links = {}
+    if linked_tables:
+        for table_name, (table, col) in linked_tables.iteritems():
+            print('updating linked table {}'.format(table_name))
+            updated_links[table_name] = \
+                update_linked_table(table, col, added, copied, removed)
+            orca.add_table(table_name, updated_links[table_name])
+
+    print("Total agents after transition: {}".format(len(updated)))
+    orca.add_table(agents.name, updated[agents.local_columns])
+
+
+def update_linked_table(tbl, col_name, added, copied, removed):
+    """
+    Copy and update rows in a table that has a column referencing another
+    table that has had rows added via copying.
+
+    Parameters
+    ----------
+    tbl : DataFrameWrapper
+        Table to update with new or removed rows.
+    col_name : str
+        Name of column in `table` that corresponds to the index values
+        in `copied` and `removed`.
+    added : pandas.Index
+        Indexes of rows that are new in the linked table.
+    copied : pandas.Index
+        Indexes of rows that were copied to make new rows in linked table.
+    removed : pandas.Index
+        Indexes of rows that were removed from the linked table.
+
+    Returns
+    -------
+    updated : pandas.DataFrame
+
+    """
+    print('start: update linked table after transition')
+
+    # handle removals
+    table = tbl.local
+    table = table.loc[~table[col_name].isin(set(removed))]
+    removed = table.loc[table[col_name].isin(set(removed))]
+    if (added is None or len(added) == 0):
+        return table
+
+    # map new IDs to the IDs from which they were copied
+    id_map = pd.concat([pd.Series(copied, name=col_name),
+                        pd.Series(added, name='temp_id')], axis=1)
+
+    # join to linked table and assign new id
+    new_rows = id_map.merge(table, on=col_name)
+    new_rows.drop(col_name, axis=1, inplace=True)
+    new_rows.rename(columns={'temp_id': col_name}, inplace=True)
+
+    # index the new rows
+    starting_index = table.index.values.max() + 1
+    new_rows.index = np.arange(starting_index,
+                               starting_index + len(new_rows), dtype=np.int)
+
+    if orca.get_injectable('track_changes'):
+        add_data = (tbl.name, added)
+        record_change_sets("added", add_data)
+        remove_data = (tbl.name, removed.index)
+        record_change_sets("removed", remove_data)
+
+    print('finish: update linked table after transition')
+    return pd.concat([table, new_rows])
 
 
 def record_change_sets(change_type, change_data):
@@ -302,8 +506,9 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
 
     """
     def set_simulation_params(self, name, supply_variable, vacant_variable,
-                              choosers, alternatives, summary_alts_xref=None,
-                              merge_tables=None):
+                              choosers, alternatives, choice_column=None,
+                              summary_alts_xref=None, merge_tables=None,
+                              agent_units=None):
         """
         Add simulation parameters as additional attributes.
         Parameters
@@ -327,6 +532,9 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         merge_tables : list of str, optional
             List of additional tables to be broadcast onto the alternatives
             table.
+        agent_units : str, optional
+            Name of the column in the choosers table that designates how
+            much supply is occupied by each chooser.
         Returns
         -------
         None
@@ -338,6 +546,9 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         self.alternatives = alternatives
         self.summary_alts_xref = summary_alts_xref
         self.merge_tables = merge_tables
+        self.agent_units = agent_units
+        self.choice_column = choice_column if choice_column is not None \
+            else self.choice_column
 
     def simulate(self, choice_function=None, save_probabilities=False,
                  **kwargs):
@@ -364,6 +575,9 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         """
         choosers, alternatives = self.calculate_model_variables()
 
+        choosers, alternatives = self.apply_predict_filters(
+                                 choosers, alternatives)
+
         # By convention, choosers are denoted by a -1 value
         # in the choice column
         choosers = choosers[choosers[self.choice_column] == -1]
@@ -386,6 +600,17 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
                 probabilities)
 
         return choices
+
+    def fit_model(self):
+        """
+        Estimate model based on existing parameters
+        Returns
+        -------
+        None
+        """
+        choosers, alternatives = self.calculate_model_variables()
+        self.fit(choosers, alternatives, choosers[self.choice_column])
+        return self.log_likelihoods, self.fit_parameters
 
     def calculate_probabilities(self, choosers, alternatives):
         """
@@ -423,6 +648,9 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         supply_column_names = [col for col in
                                [self.supply_variable, self.vacant_variable]
                                if col is not None]
+
+        columns_used.extend(supply_column_names)
+
         if self.merge_tables:
             import copy
             mt = copy.deepcopy(self.merge_tables)
@@ -430,9 +658,9 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
             all_cols = []
             for table in mt:
                 all_cols.extend(orca.get_table(table).columns)
-            all_cols = [col for col in all_cols if col in self.columns_used()]
+            all_cols = [col for col in all_cols if col in columns_used]
             alternatives = orca.merge_tables(target=self.alternatives,
-                               tables=mt, columns=all_cols)
+                                             tables=mt, columns=all_cols)
         else:
             alternatives = orca.get_table(self.alternatives).to_frame(
                 columns_used + supply_column_names)
@@ -561,11 +789,18 @@ def create_lcm_from_config(config_filename, model_attributes):
     model = SimulationChoiceModel.from_yaml(
         str_or_buffer=misc.config(config_filename))
     merge_tables = model_attributes['merge_tables'] \
-                    if 'merge_tables' in model_attributes else None
+        if 'merge_tables' in model_attributes else None
+    agent_units = model_attributes['agent_units'] \
+        if 'agent_units' in model_attributes else None
+    choice_column = model_attributes['alternatives_id_name'] \
+        if model.choice_column is None and 'alternatives_id_name' \
+        in model_attributes else None
     model.set_simulation_params(model_name,
                                 model_attributes['supply_variable'],
                                 model_attributes['vacant_variable'],
                                 model_attributes['agents_name'],
                                 model_attributes['alternatives_name'],
-                                merge_tables=merge_tables)
+                                choice_column=choice_column,
+                                merge_tables=merge_tables,
+                                agent_units=agent_units)
     return model
