@@ -307,7 +307,7 @@ def full_transition(agents, agent_controls, totals_column, year,
     updated_links = {}
     if linked_tables:
         for table_name, (table, col) in linked_tables.iteritems():
-            logger.debug('updating linked table {}'.format(table_name))
+            print('updating linked table {}'.format(table_name))
             updated_links[table_name] = \
                     update_linked_table(table, col, added, copied, removed)
             orca.add_table(table_name, updated_links[table_name])
@@ -340,7 +340,7 @@ def update_linked_table(tbl, col_name, added, copied, removed):
     updated : pandas.DataFrame
 
     """
-    logger.debug('start: update linked table after transition')
+    print('start: update linked table after transition')
 
     # handle removals
     table = tbl.local
@@ -369,7 +369,7 @@ def update_linked_table(tbl, col_name, added, copied, removed):
         remove_data = (tbl.name, removed.index)
         record_change_sets("removed", remove_data)
 
-    logger.debug('finish: update linked table after transition')
+    print('finish: update linked table after transition')
     return pd.concat([table, new_rows])
 
 
