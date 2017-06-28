@@ -298,20 +298,21 @@ def full_transition(agents, agent_controls, totals_column, year,
     ct = agent_controls.to_frame()
     agnt = agents.to_frame(agents.local_columns)
     print("Total agents before transition: {}".format(len(agnt)))
-    tran = transition.TabularTotalsTransition(ct, totals_column, accounting_column)
+    tran = transition.TabularTotalsTransition(ct, totals_column,
+                                              accounting_column)
     updated, added, copied, removed = tran.transition(agnt, year)
     updated.loc[added, location_fname] = -1
     if set_year_built:
         updated.loc[added, 'year_built'] = year
-    
+
     updated_links = {}
     if linked_tables:
         for table_name, (table, col) in linked_tables.iteritems():
             print('updating linked table {}'.format(table_name))
             updated_links[table_name] = \
-                    update_linked_table(table, col, added, copied, removed)
+                update_linked_table(table, col, added, copied, removed)
             orca.add_table(table_name, updated_links[table_name])
-    
+
     print("Total agents after transition: {}".format(len(updated)))
     orca.add_table(agents.name, updated[agents.local_columns])
 
@@ -362,7 +363,7 @@ def update_linked_table(tbl, col_name, added, copied, removed):
     starting_index = table.index.values.max() + 1
     new_rows.index = np.arange(starting_index,
                                starting_index + len(new_rows), dtype=np.int)
-    
+
     if orca.get_injectable('track_changes'):
         add_data = (tbl.name, added)
         record_change_sets("added", add_data)
