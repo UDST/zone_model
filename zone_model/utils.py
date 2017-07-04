@@ -718,6 +718,97 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
 
         return scoring_function(observed_choices, predicted_choices)
 
+    def single_alternative_proba(self, alternative_data, choosers=None,
+                                 alternatives=None):
+        """
+        Probability of a single alternative with user-supplied attributes
+        being selected. For use in diagnostic settings.
+        Parameters
+        ----------
+        alternative_data : dict or pd.Series
+            The single alternative's attributes.  A mapping between variable
+            name and variable value.  Should contain key for each explanatory
+            variable in the model specification.
+        choosers : pandas.DataFrame, optional
+            DataFrame of choosers.
+        alternatives : pandas.DataFrame, optional
+            DataFrame of alternatives.
+        Returns
+        -------
+        probability : float
+            Probability of alternative with user-supplied characteristics
+            being selected.
+        """
+        if choosers is None or alternatives is None:
+            choosers, alternatives = self.calculate_model_variables()
+
+        alternatives_plus = alternatives.append(alternative_data,
+                                                ignore_index=True)
+        probabilities = self.calculate_probabilities(choosers,
+                                                     alternatives_plus)
+
+        probability = probabilities.iloc[-1]
+
+        return probability
+
+    def relative_probabilities(self, low_percentile=.05, high_percentile=.95,
+                               choosers=None, alternatives=None):
+        """
+        Indicator of explanatory variable influence.  For each variable,
+        calculate relative variable probability contribution by holding all
+        other variables at their median value and having the variable of
+        interest take on its 5th and 95th percentile values, then calculating
+        the difference in resulting probabilities.
+        Parameters
+        ----------
+        low_percentile : float, optional
+            The percentile that represents the value variable takes on in the
+            low end of its range.
+        high_percentile : float, optional
+            The percentile that represents the value variable takes on in the
+            high end of its range.
+        choosers : pandas.DataFrame, optional
+            DataFrame of choosers.
+        alternatives : pandas.DataFrame, optional
+            DataFrame of alternatives.
+        Returns
+        -------
+        relative_probabilities : dict
+            Mapping between variable name and it's contribution to
+            probability.
+        """
+        if choosers is None or alternatives is None:
+            choosers, alternatives = self.calculate_model_variables()
+
+        explanatory_variables = list(self.model_expression)
+        alternatives = alternatives[explanatory_variables]
+
+        relative_probabilities = {}
+        for var_to_measure in explanatory_variables:
+
+            low_percentile_value = alternatives[var_to_measure].quantile(
+                                                               low_percentile)
+            high_percentile_value = alternatives[var_to_measure].quantile(
+                                                              high_percentile)
+
+            constant_vars = [var for var in explanatory_variables if
+                             var != var_to_measure]
+
+            mock_observation = alternatives[constant_vars].median()
+
+            mock_observation[var_to_measure] = high_percentile_value
+            high_proba = self.single_alternative_proba(mock_observation,
+                                                       choosers, alternatives)
+
+            mock_observation[var_to_measure] = low_percentile_value
+            low_proba = self.single_alternative_proba(mock_observation,
+                                                      choosers, alternatives)
+
+            proba_difference = high_proba - low_proba
+            relative_probabilities[var_to_measure] = proba_difference
+
+        return relative_probabilities
+
 
 class SimpleEnsemble(SimulationChoiceModel):
     """

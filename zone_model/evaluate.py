@@ -35,3 +35,7 @@ for model_name, model in location_choice_models.items():
 
     corr = model.score(scoring_function=correlate, aggregate=True)
     print("  Correlation is {}".format(corr))
+
+    relative_probabilities = pd.Series(model.relative_probabilities())
+    print("  Variables by probability influence:")
+    print(relative_probabilities.sort_values(ascending=False))
