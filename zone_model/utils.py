@@ -17,7 +17,6 @@ from urbansim.models import MNLDiscreteChoiceModel
 from urbansim.models import GrowthRateTransition, transition
 
 
-
 def random_choices(model, choosers, alternatives):
     """
     Simulate choices using random choice, weighted by probability
@@ -721,7 +720,8 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
             observed_choices = observed_choices.value_counts()
             predicted_choices = predicted_choices.value_counts()
 
-        combined_index = list(set(list(predicted_choices.index) + list(observed_choices.index)))
+        combined_index = list(set(list(predicted_choices.index) +
+                                  list(observed_choices.index)))
         predicted_choices = predicted_choices.reindex(combined_index).fillna(0)
         observed_choices = observed_choices.reindex(combined_index).fillna(0)
 
@@ -736,19 +736,20 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
 
         if self.choosers_fit_filters:
             choosers = choosers.query(self.choosers_fit_filters)
-            
+
         if self.choosers_predict_filters:
             choosers = choosers.query(self.choosers_predict_filters)
 
-        choosers['summary_id'] = choosers[self.choice_column].map(self.summary_alts_xref)
-        probas = self.calculate_probabilities(choosers, alternatives)
-        probas = probas.reset_index().rename(columns={0:'proba'})
-        probas['summary_id'] = probas.alternative_id.map(self.summary_alts_xref)
-        return  probas.groupby('summary_id').proba.sum()
+        choosers['summary_id'] = choosers[self.choice_column]
+        choosers.summary_id = choosers.summary_id.map(self.summary_alts_xref)
+        probs = self.calculate_probabilities(choosers, alternatives)
+        probs = probs.reset_index().rename(columns={0: 'proba'})
+        probs['summary_id'] = probs.alternative_id.map(self.summary_alts_xref)
+        return probs.groupby('summary_id').proba.sum()
 
     def observed_distribution(self, choosers=None):
         """
-        Calculate observed distribution across alternatives at the summary 
+        Calculate observed distribution across alternatives at the summary
         geography level.
         """
         if choosers is None:
@@ -756,24 +757,26 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
 
         if self.choosers_fit_filters:
             choosers = choosers.query(self.choosers_fit_filters)
-            
+
         if self.choosers_predict_filters:
             choosers = choosers.query(self.choosers_predict_filters)
 
         if 'summary_id' not in choosers.columns:
-            choosers['summary_id'] = choosers[self.choice_column].map(self.summary_alts_xref)
+            summ_id = choosers[self.choice_column].map(self.summary_alts_xref)
+            choosers['summary_id'] = summ_id
 
         observed_distrib = choosers.groupby('summary_id').size()
         return observed_distrib / observed_distrib.sum()
 
-    def summed_probability_score(self, scoring_function=r2_score, choosers=None,
-                                 alternatives=None, validation_data=None):
+    def summed_probability_score(self, scoring_function=r2_score,
+                                 choosers=None, alternatives=None,
+                                 validation_data=None):
         if choosers is None or alternatives is None:
             choosers, alternatives = self.calculate_model_variables()
 
         if self.choosers_fit_filters:
             choosers = choosers.query(self.choosers_fit_filters)
-            
+
         if self.choosers_predict_filters:
             choosers = choosers.query(self.choosers_predict_filters)
 
@@ -782,7 +785,8 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         if validation_data is None:
             validation_data = self.observed_distribution(choosers)
 
-        combined_index = list(set(list(summed_probas.index) + list(validation_data.index)))
+        combined_index = list(set(list(summed_probas.index) +
+                                  list(validation_data.index)))
         summed_probas = summed_probas.reindex(combined_index).fillna(0)
         validation_data = validation_data.reindex(combined_index).fillna(0)
 
@@ -840,23 +844,26 @@ class SimpleEnsemble(SimulationChoiceModel):
         return choosers, alternatives
 
 
-def create_lcm_training_data(choosers, alternatives, alts_sample_size, current_choice, model_expression=None):
+def create_lcm_training_data(choosers, alternatives, alts_sample_size,
+                             current_choice, model_expression=None):
     """Create training dataset for scikit-learn-based location choice models"""
-    
+
     current_choice = choosers[current_choice]
-    
+
     _, merged, chosen = interaction.mnl_interaction_dataset(
                 choosers, alternatives, alts_sample_size, current_choice)
     if model_expression is not None:
         model_expression = list(alternatives.columns.values)
-        str_model_expression = util.str_model_expression(model_expression, add_constant=False)
-        model_design = dmatrix(str_model_expression, data=merged, return_type='dataframe')
+        str_model_expression = util.str_model_expression(model_expression,
+                                                         add_constant=False)
+        model_design = dmatrix(str_model_expression, data=merged,
+                               return_type='dataframe')
         X = model_design.as_matrix()
         alt_index = model_design.index
     else:
         X = merged[merged.columns[:-2]].as_matrix()
         alt_index = merged.index
-    
+
     y = chosen.ravel()
 
     return X, y, alt_index
@@ -864,61 +871,66 @@ def create_lcm_training_data(choosers, alternatives, alts_sample_size, current_c
 
 class SklearnLocationModel:
     """Model location choice with scikit-learn models"""
-    
-    def __init__(self, clf_class, choice_column, summary_alts_xref=None, exp_vars=None, 
-                 scaler=None, **kwargs):
+
+    def __init__(self, clf_class, choice_column, summary_alts_xref=None,
+                 exp_vars=None, scaler=None, **kwargs):
         self.clf_class = clf_class
         self.clf = clf_class(**kwargs)
         self.exp_vars = exp_vars
         self.choice_column = choice_column
         self.summary_alts_xref = summary_alts_xref
         self.scaler = scaler
-        
-    def fit(self, choosers, alternatives, alts_sample_size, current_choice, scaler=None):
+
+    def fit(self, choosers, alternatives, alts_sample_size, current_choice,
+            scaler=None):
         X, y, location_id = create_lcm_training_data(choosers,
-                                                     alternatives, 
-                                                     alts_sample_size, 
+                                                     alternatives,
+                                                     alts_sample_size,
                                                      current_choice,
                                                      self.exp_vars)
-        X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y, random_state=0)
-        
+        X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y,
+                                                            random_state=0)
+
         if self.scaler:
             scaler = self.scaler()
             scaler.fit(X_train)
             X_train = scaler.transform(X_train)
             X_test = scaler.transform(X_test)
             self.scaler = scaler
-            
+
         self.clf.fit(X_train, y_train)
-        print("Training set score: {:f}".format(self.clf.score(X_train, y_train)))
+        print("Training set score: {:f}".format(self.clf.score(X_train,
+                                                               y_train)))
         print("Test set score: {:f}".format(self.clf.score(X_test, y_test)))
         return self.clf
-    
+
     def calculate_probabilities(self, choosers, alternatives):
         alts_index = alternatives.index
         if self.exp_vars is not None:
             alternatives = alternatives[self.exp_vars]
-            
+
         alternatives = alternatives.as_matrix()
-        
+
         if self.scaler:
             alternatives = self.scaler.transform(alternatives)
-            
+
         try:
-            location_score = pd.DataFrame(self.clf.predict_proba(alternatives))[1]
-            norm_probas = pd.Series((location_score / location_score.sum()).values, index=alts_index)
-        except:
-            location_score = pd.Series(self.clf.decision_function(alternatives))
-            if location_score.min() < 0:
-                location_score = location_score + abs(location_score.min())
-            norm_probas = pd.Series((location_score / location_score.sum()).values, index=alts_index)
-        
+            loc_score = pd.DataFrame(self.clf.predict_proba(alternatives))[1]
+            norm_probas = pd.Series((loc_score / loc_score.sum()).values,
+                                    index=alts_index)
+        except Exception:
+            loc_score = pd.Series(self.clf.decision_function(alternatives))
+            if loc_score.min() < 0:
+                loc_score = loc_score + abs(loc_score.min())
+            norm_probas = pd.Series((loc_score / loc_score.sum()).values,
+                                    index=alts_index)
+
         return norm_probas
-    
+
     def simulate(self, choosers, alternatives):
         choices = random_choices(self, choosers, alternatives)
         return choices
-    
+
     def score(self, scoring_function=accuracy_score, choosers=None,
               alternatives=None, aggregate=False, apply_filter=True,
               choice_function=random_choices):
