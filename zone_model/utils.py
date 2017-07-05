@@ -11,6 +11,7 @@ from sklearn.model_selection import train_test_split
 
 import orca
 from urbansim.utils import misc
+from urbansim.models import dcm
 from urbansim.models import util
 from urbansim.urbanchoice import interaction
 from urbansim.models import MNLDiscreteChoiceModel
@@ -873,13 +874,50 @@ class SklearnLocationModel:
     """Model location choice with scikit-learn models"""
 
     def __init__(self, clf_class, choice_column, summary_alts_xref=None,
-                 exp_vars=None, scaler=None, **kwargs):
+                 exp_vars=None, scaler=None, lcm=None, feature_space=None,
+                 **kwargs):
         self.clf_class = clf_class
         self.clf = clf_class(**kwargs)
         self.exp_vars = exp_vars
         self.choice_column = choice_column
         self.summary_alts_xref = summary_alts_xref
         self.scaler = scaler
+        self.lcm = lcm
+        if lcm:
+            self.choice_mode = 'individual'
+            self.supply_variable = self.lcm.supply_variable
+            self.vacant_variable = self.lcm.vacant_variable
+        self.feature_space = feature_space
+        self.numeric_subsetted = False
+
+    def calculate_model_variables(self, simulation=False):
+        if simulation:
+            supply_column_names = [col for col in
+                                   [self.supply_variable, 
+                                    self.vacant_variable]
+                                   if col is not None]
+
+        if self.exp_vars:
+            columns = self.exp_vars
+            if simulation:
+                columns = columns + supply_column_names
+            alts = orca.get_table(self.lcm.alternatives).to_frame(columns)
+
+        else:
+            alts = orca.get_table(self.lcm.alternatives).to_frame(self.feature_space)
+            if not self.numeric_subsetted:
+                numerics = ['int16', 'int32', 'int64', 'float16', 'float32', 'float64']
+                alts = alts.select_dtypes(include=numerics)
+                self.feature_space = list(alts.columns.values)
+                self.numeric_subsetted = True
+
+        columns_used = self.lcm.columns_used() + [self.lcm.choice_column]
+        choosers = orca.get_table(self.lcm.choosers).to_frame(columns_used)
+        if not simulation:
+            choosers = choosers.query(self.lcm.choosers_fit_filters)
+            choosers = choosers.query(self.lcm.choosers_predict_filters)
+
+        return choosers, alts
 
     def fit(self, choosers, alternatives, alts_sample_size, current_choice,
             scaler=None):
@@ -927,8 +965,37 @@ class SklearnLocationModel:
 
         return norm_probas
 
-    def simulate(self, choosers, alternatives):
-        choices = random_choices(self, choosers, alternatives)
+    def simulate(self, choice_function=random_choices, choosers=None, alternatives=None):
+        if choosers is None or alternatives is None:
+            choosers, alternatives = self.calculate_model_variables(simulation=True)
+
+        choosers, alternatives = self.lcm.apply_predict_filters(
+                                         choosers, alternatives)
+
+        choosers = choosers[choosers[self.choice_column] == -1]
+        print("{} agents are making a choice.".format(len(choosers)))
+
+        choices = choice_function(self, choosers, alternatives)
+        return choices
+
+    def predict(self, choosers, alternatives, debug=True):
+        if len(choosers) == 0:
+            return pd.Series()
+
+        if len(alternatives) == 0:
+            return pd.Series(index=choosers.index)
+
+        probabilities = self.calculate_probabilities(
+                              choosers[[self.choice_column]],
+                              alternatives[self.exp_vars])
+
+        if debug:
+            self.sim_pdf = probabilities
+
+        choices = dcm.unit_choice(
+             choosers.index.values,
+             probabilities.index.values,
+             probabilities.values)
         return choices
 
     def score(self, scoring_function=accuracy_score, choosers=None,
@@ -947,6 +1014,43 @@ class SklearnLocationModel:
             predicted_choices = predicted_choices.value_counts()
 
         return scoring_function(observed_choices, predicted_choices)
+
+    def summed_probability_score(self):
+        choosers, alts = self.calculate_model_variables()
+        if self.exp_vars:
+            alts = alts[self.exp_vars]
+        else:
+            alts = alts[self.feature_space]
+        probas = self.calculate_probabilities(choosers, alts)
+        probas = probas.reset_index().rename(columns={0:'proba'})
+        summ_id = probas[self.choice_column].map(self.summary_alts_xref)
+        probas['summary_id'] = summ_id
+        summed_probas = probas.groupby('summary_id').proba.sum()
+
+        validation_data = self.lcm.observed_distribution()
+
+        combined_index = list(set(list(summed_probas.index) +
+                                  list(validation_data.index)))
+        summed_probas = summed_probas.reindex(combined_index).fillna(0)
+        validation_data = validation_data.reindex(combined_index).fillna(0)
+
+        print(summed_probas.corr(validation_data))
+        print(r2_score(validation_data, summed_probas))
+
+        residuals = summed_probas - validation_data
+        return residuals
+
+    def calculate_feature_importance(self):
+        features_by_importance = []
+        for feature in zip(self.feature_space, self.clf.feature_importances_):
+            features_by_importance.append(feature)
+
+        return pd.DataFrame(features_by_importance, columns=['variable', 'fi'])
+
+    def select_n_most_important_features(self, n=10):
+        feature_importance = self.calculate_feature_importance()
+        top_n = feature_importance.sort_values('fi', ascending=False).head(n)
+        return list(top_n.variable.values)
 
 
 def get_model_category_configs():
