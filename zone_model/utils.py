@@ -6,6 +6,7 @@ import yaml
 import numpy as np
 import pandas as pd
 from patsy import dmatrix
+from sklearn.externals import joblib
 from sklearn.metrics import accuracy_score, r2_score
 from sklearn.model_selection import train_test_split
 
@@ -887,6 +888,8 @@ class SklearnLocationModel:
             self.choice_mode = 'individual'
             self.supply_variable = self.lcm.supply_variable
             self.vacant_variable = self.lcm.vacant_variable
+            self.name = self.lcm.name
+            self.choosers = self.lcm.choosers
         self.feature_space = feature_space
         self.numeric_subsetted = False
 
@@ -914,8 +917,10 @@ class SklearnLocationModel:
         columns_used = self.lcm.columns_used() + [self.lcm.choice_column]
         choosers = orca.get_table(self.lcm.choosers).to_frame(columns_used)
         if not simulation:
-            choosers = choosers.query(self.lcm.choosers_fit_filters)
-            choosers = choosers.query(self.lcm.choosers_predict_filters)
+            if self.lcm.choosers_fit_filters:
+                choosers = choosers.query(self.lcm.choosers_fit_filters)
+            if self.lcm.choosers_predict_filters:
+                choosers = choosers.query(self.lcm.choosers_predict_filters)
 
         return choosers, alts
 
@@ -1052,6 +1057,13 @@ class SklearnLocationModel:
         top_n = feature_importance.sort_values('fi', ascending=False).head(n)
         return list(top_n.variable.values)
 
+    def to_joblib_pkl(self, model_name):
+        joblib.dump(self, '{}.pkl'.format(model_name))
+
+    def from_joblib_pkl(self, model_name):
+        pass
+        # self.clf = joblib.load('{}.pkl'.format(model_name)) 
+    
 
 def get_model_category_configs():
     """
