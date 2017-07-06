@@ -14,9 +14,11 @@ import orca
 from urbansim.utils import misc
 from urbansim.models import dcm
 from urbansim.models import util
+from urbansim.models import transition
 from urbansim.urbanchoice import interaction
+from urbansim.models import GrowthRateTransition
 from urbansim.models import MNLDiscreteChoiceModel
-from urbansim.models import GrowthRateTransition, transition
+from urbansim.models.regression import RegressionModel
 
 
 def random_choices(model, choosers, alternatives):
@@ -952,7 +954,8 @@ class SklearnLocationModel:
         if self.exp_vars is not None:
             alternatives = alternatives[self.exp_vars]
 
-        alternatives = alternatives.as_matrix()
+        alternatives = alternatives.fillna(0).as_matrix()
+        alternatives[alternatives == np.inf] = 0
 
         if self.scaler:
             alternatives = self.scaler.transform(alternatives)
@@ -1063,6 +1066,75 @@ class SklearnLocationModel:
     def from_joblib_pkl(self, model_name):
         pass
         # self.clf = joblib.load('{}.pkl'.format(model_name)) 
+
+
+class RegressionProbabilityModel:
+    """Model agent location choice with share-regression models 
+       determining the probabilities."""
+
+    def __init__(self, yaml_config_path, lcm=None):
+        self.rm = RegressionModel.from_yaml(str_or_buffer=yaml_config_path)
+        self.lcm = lcm
+        if lcm:
+            self.choice_mode = 'individual'
+            self.supply_variable = self.lcm.supply_variable
+            self.vacant_variable = self.lcm.vacant_variable
+            self.name = self.lcm.name
+            self.choosers = self.lcm.choosers
+            self.choice_column = self.lcm.choice_column
+        
+    def calculate_model_variables(self):
+        supply_column_names = [col for col in
+                               [self.supply_variable, 
+                                self.vacant_variable]
+                               if col is not None]
+        columns_used = self.rm.columns_used() + supply_column_names
+        alts = orca.get_table(self.lcm.alternatives).to_frame(columns_used)
+        
+        columns_used = self.lcm.columns_used() + [self.lcm.choice_column]
+        choosers = orca.get_table(self.lcm.choosers).to_frame(columns_used)
+        
+        return choosers, alts
+    
+    def calculate_probabilities(self, chooser, alternatives):
+        predicted_probas = self.rm.predict(alternatives)
+        min_proba = predicted_probas.min()
+        if min_proba < 0:
+            predicted_probas = predicted_probas + abs(min_proba)
+        norm_probas = predicted_probas / predicted_probas.sum()
+        return norm_probas
+    
+    def simulate(self, choice_function=random_choices):
+        choosers, alternatives = self.calculate_model_variables()
+
+        choosers, alternatives = self.lcm.apply_predict_filters(
+                                         choosers, alternatives)
+
+        choosers = choosers[choosers[self.lcm.choice_column] == -1]
+        print("{} agents are making a choice.".format(len(choosers)))
+
+        choices = choice_function(self, choosers, alternatives)
+        return choices
+    
+    def predict(self, choosers, alternatives, debug=True):
+        if len(choosers) == 0:
+            return pd.Series()
+
+        if len(alternatives) == 0:
+            return pd.Series(index=choosers.index)
+
+        probabilities = self.calculate_probabilities(
+                              choosers[[self.lcm.choice_column]],
+                              alternatives)
+
+        if debug:
+            self.sim_pdf = probabilities
+
+        choices = dcm.unit_choice(
+             choosers.index.values,
+             probabilities.index.values,
+             probabilities.values)
+        return choices
     
 
 def get_model_category_configs():
