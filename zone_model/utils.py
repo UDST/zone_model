@@ -1075,8 +1075,15 @@ class RegressionProbabilityModel:
     """Model agent location choice with share-regression models
        determining the probabilities."""
 
-    def __init__(self, yaml_config_path, lcm=None):
-        self.rm = RegressionModel.from_yaml(str_or_buffer=yaml_config_path)
+    def __init__(self, config_path, lcm=None):
+        if config_path.endswith('.yaml'):
+            self.rm = RegressionModel.from_yaml(str_or_buffer=yaml_config_path)
+            self.model_type = 'urbansim'
+            self.exp_vars = self.rm.columns_used()
+        else:
+            self.rm = joblib.load(config_path)
+            self.model_type = 'sklearn'
+            self.exp_vars = self.rm.exp_vars
         self.lcm = lcm
         if lcm:
             self.choice_mode = 'individual'
@@ -1091,7 +1098,7 @@ class RegressionProbabilityModel:
                                [self.supply_variable,
                                 self.vacant_variable]
                                if col is not None]
-        columns_used = self.rm.columns_used() + supply_column_names
+        columns_used = self.exp_vars + supply_column_names
         alts = orca.get_table(self.lcm.alternatives).to_frame(columns_used)
 
         columns_used = self.lcm.columns_used() + [self.lcm.choice_column]
@@ -1100,7 +1107,11 @@ class RegressionProbabilityModel:
         return choosers, alts
 
     def calculate_probabilities(self, chooser, alternatives):
+        alternatives = alternatives[self.exp_vars]
         predicted_probas = self.rm.predict(alternatives)
+        if self.model_type == 'sklearn':
+            predicted_probas = pd.Series(predicted_probas,
+                                         index=alternatives.index)
         min_proba = predicted_probas.min()
         if min_proba < 0:
             predicted_probas = predicted_probas + abs(min_proba)
