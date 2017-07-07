@@ -6,15 +6,19 @@ import yaml
 import numpy as np
 import pandas as pd
 from patsy import dmatrix
+from sklearn.externals import joblib
 from sklearn.metrics import accuracy_score, r2_score
 from sklearn.model_selection import train_test_split
 
 import orca
 from urbansim.utils import misc
+from urbansim.models import dcm
 from urbansim.models import util
+from urbansim.models import transition
 from urbansim.urbanchoice import interaction
+from urbansim.models import GrowthRateTransition
 from urbansim.models import MNLDiscreteChoiceModel
-from urbansim.models import GrowthRateTransition, transition
+from urbansim.models.regression import RegressionModel
 
 
 def random_choices(model, choosers, alternatives):
@@ -873,13 +877,56 @@ class SklearnLocationModel:
     """Model location choice with scikit-learn models"""
 
     def __init__(self, clf_class, choice_column, summary_alts_xref=None,
-                 exp_vars=None, scaler=None, **kwargs):
+                 exp_vars=None, scaler=None, lcm=None, feature_space=None,
+                 **kwargs):
         self.clf_class = clf_class
         self.clf = clf_class(**kwargs)
         self.exp_vars = exp_vars
         self.choice_column = choice_column
         self.summary_alts_xref = summary_alts_xref
         self.scaler = scaler
+        self.lcm = lcm
+        if lcm:
+            self.choice_mode = 'individual'
+            self.supply_variable = self.lcm.supply_variable
+            self.vacant_variable = self.lcm.vacant_variable
+            self.name = self.lcm.name
+            self.choosers = self.lcm.choosers
+        self.feature_space = feature_space
+        self.numeric_subsetted = False
+
+    def calculate_model_variables(self, sim=False):
+        if sim:
+            supply_column_names = [col for col in
+                                   [self.supply_variable,
+                                    self.vacant_variable]
+                                   if col is not None]
+
+        if self.exp_vars:
+            columns = self.exp_vars
+            if sim:
+                columns = columns + supply_column_names
+            alts = orca.get_table(self.lcm.alternatives).to_frame(columns)
+
+        else:
+            alts = orca.get_table(self.lcm.alternatives)
+            alts = alts.to_frame(self.feature_space)
+            if not self.numeric_subsetted:
+                numerics = ['int16', 'int32', 'int64', 'float16',
+                            'float32', 'float64']
+                alts = alts.select_dtypes(include=numerics)
+                self.feature_space = list(alts.columns.values)
+                self.numeric_subsetted = True
+
+        columns_used = self.lcm.columns_used() + [self.lcm.choice_column]
+        choosers = orca.get_table(self.lcm.choosers).to_frame(columns_used)
+        if not sim:
+            if self.lcm.choosers_fit_filters:
+                choosers = choosers.query(self.lcm.choosers_fit_filters)
+            if self.lcm.choosers_predict_filters:
+                choosers = choosers.query(self.lcm.choosers_predict_filters)
+
+        return choosers, alts
 
     def fit(self, choosers, alternatives, alts_sample_size, current_choice,
             scaler=None):
@@ -909,7 +956,8 @@ class SklearnLocationModel:
         if self.exp_vars is not None:
             alternatives = alternatives[self.exp_vars]
 
-        alternatives = alternatives.as_matrix()
+        alternatives = alternatives.fillna(0).as_matrix()
+        alternatives[alternatives == np.inf] = 0
 
         if self.scaler:
             alternatives = self.scaler.transform(alternatives)
@@ -927,8 +975,38 @@ class SklearnLocationModel:
 
         return norm_probas
 
-    def simulate(self, choosers, alternatives):
-        choices = random_choices(self, choosers, alternatives)
+    def simulate(self, choice_function=random_choices, choosers=None,
+                 alternatives=None):
+        if choosers is None or alternatives is None:
+            choosers, alternatives = self.calculate_model_variables(sim=True)
+
+        choosers, alternatives = self.lcm.apply_predict_filters(
+                                         choosers, alternatives)
+
+        choosers = choosers[choosers[self.choice_column] == -1]
+        print("{} agents are making a choice.".format(len(choosers)))
+
+        choices = choice_function(self, choosers, alternatives)
+        return choices
+
+    def predict(self, choosers, alternatives, debug=True):
+        if len(choosers) == 0:
+            return pd.Series()
+
+        if len(alternatives) == 0:
+            return pd.Series(index=choosers.index)
+
+        probabilities = self.calculate_probabilities(
+                              choosers[[self.choice_column]],
+                              alternatives[self.exp_vars])
+
+        if debug:
+            self.sim_pdf = probabilities
+
+        choices = dcm.unit_choice(
+             choosers.index.values,
+             probabilities.index.values,
+             probabilities.values)
         return choices
 
     def score(self, scoring_function=accuracy_score, choosers=None,
@@ -947,6 +1025,130 @@ class SklearnLocationModel:
             predicted_choices = predicted_choices.value_counts()
 
         return scoring_function(observed_choices, predicted_choices)
+
+    def summed_probability_score(self):
+        choosers, alts = self.calculate_model_variables()
+        if self.exp_vars:
+            alts = alts[self.exp_vars]
+        else:
+            alts = alts[self.feature_space]
+        probas = self.calculate_probabilities(choosers, alts)
+        probas = probas.reset_index().rename(columns={0: 'proba'})
+        summ_id = probas[self.choice_column].map(self.summary_alts_xref)
+        probas['summary_id'] = summ_id
+        summed_probas = probas.groupby('summary_id').proba.sum()
+
+        validation_data = self.lcm.observed_distribution()
+
+        combined_index = list(set(list(summed_probas.index) +
+                                  list(validation_data.index)))
+        summed_probas = summed_probas.reindex(combined_index).fillna(0)
+        validation_data = validation_data.reindex(combined_index).fillna(0)
+
+        print(summed_probas.corr(validation_data))
+        print(r2_score(validation_data, summed_probas))
+
+        residuals = summed_probas - validation_data
+        return residuals
+
+    def calculate_feature_importance(self):
+        features_by_importance = []
+        for feature in zip(self.feature_space, self.clf.feature_importances_):
+            features_by_importance.append(feature)
+
+        return pd.DataFrame(features_by_importance, columns=['variable', 'fi'])
+
+    def select_n_most_important_features(self, n=10):
+        feature_importance = self.calculate_feature_importance()
+        top_n = feature_importance.sort_values('fi', ascending=False).head(n)
+        return list(top_n.variable.values)
+
+    def to_joblib_pkl(self, model_name):
+        joblib.dump(self, '{}.pkl'.format(model_name))
+
+    def from_joblib_pkl(self, model_name):
+        pass
+        # self.clf = joblib.load('{}.pkl'.format(model_name))
+
+
+class RegressionProbabilityModel:
+    """Model agent location choice with share-regression models
+       determining the probabilities."""
+
+    def __init__(self, config_path, lcm=None):
+        if config_path.endswith('.yaml'):
+            self.rm = RegressionModel.from_yaml(str_or_buffer=yaml_config_path)
+            self.model_type = 'urbansim'
+            self.exp_vars = self.rm.columns_used()
+        else:
+            self.rm = joblib.load(config_path)
+            self.model_type = 'sklearn'
+            self.exp_vars = self.rm.exp_vars
+        self.lcm = lcm
+        if lcm:
+            self.choice_mode = 'individual'
+            self.supply_variable = self.lcm.supply_variable
+            self.vacant_variable = self.lcm.vacant_variable
+            self.name = self.lcm.name
+            self.choosers = self.lcm.choosers
+            self.choice_column = self.lcm.choice_column
+
+    def calculate_model_variables(self):
+        supply_column_names = [col for col in
+                               [self.supply_variable,
+                                self.vacant_variable]
+                               if col is not None]
+        columns_used = self.exp_vars + supply_column_names
+        alts = orca.get_table(self.lcm.alternatives).to_frame(columns_used)
+
+        columns_used = self.lcm.columns_used() + [self.lcm.choice_column]
+        choosers = orca.get_table(self.lcm.choosers).to_frame(columns_used)
+
+        return choosers, alts
+
+    def calculate_probabilities(self, chooser, alternatives):
+        alternatives = alternatives[self.exp_vars]
+        predicted_probas = self.rm.predict(alternatives)
+        if self.model_type == 'sklearn':
+            predicted_probas = pd.Series(predicted_probas,
+                                         index=alternatives.index)
+        min_proba = predicted_probas.min()
+        if min_proba < 0:
+            predicted_probas = predicted_probas + abs(min_proba)
+        norm_probas = predicted_probas / predicted_probas.sum()
+        return norm_probas
+
+    def simulate(self, choice_function=random_choices):
+        choosers, alternatives = self.calculate_model_variables()
+
+        choosers, alternatives = self.lcm.apply_predict_filters(
+                                         choosers, alternatives)
+
+        choosers = choosers[choosers[self.lcm.choice_column] == -1]
+        print("{} agents are making a choice.".format(len(choosers)))
+
+        choices = choice_function(self, choosers, alternatives)
+        return choices
+
+    def predict(self, choosers, alternatives, debug=True):
+        if len(choosers) == 0:
+            return pd.Series()
+
+        if len(alternatives) == 0:
+            return pd.Series(index=choosers.index)
+
+        probabilities = self.calculate_probabilities(
+                              choosers[[self.lcm.choice_column]],
+                              alternatives)
+
+        if debug:
+            self.sim_pdf = probabilities
+
+        choices = dcm.unit_choice(
+             choosers.index.values,
+             probabilities.index.values,
+             probabilities.values)
+        return choices
 
 
 def get_model_category_configs():
