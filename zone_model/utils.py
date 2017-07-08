@@ -711,7 +711,10 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
             choosers, alternatives = self.calculate_model_variables()
 
         if apply_filter:
-            choosers = choosers.query(self.choosers_predict_filters)
+            if self.choosers_predict_filters:
+                choosers = choosers.query(self.choosers_predict_filters)
+            if self.choosers_fit_filters:
+                choosers = choosers.query(self.choosers_fit_filters)
 
         observed_choices = choosers[self.choice_column]
         predicted_choices = choice_function(self, choosers, alternatives)
@@ -724,10 +727,10 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
             observed_choices = observed_choices.value_counts()
             predicted_choices = predicted_choices.value_counts()
 
-        combined_index = list(set(list(predicted_choices.index) +
-                                  list(observed_choices.index)))
-        predicted_choices = predicted_choices.reindex(combined_index).fillna(0)
-        observed_choices = observed_choices.reindex(combined_index).fillna(0)
+            combined_index = list(set(list(predicted_choices.index) +
+                                      list(observed_choices.index)))
+            predicted_choices = predicted_choices.reindex(combined_index).fillna(0)
+            observed_choices = observed_choices.reindex(combined_index).fillna(0)
 
         return scoring_function(observed_choices, predicted_choices)
 
@@ -795,10 +798,11 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         validation_data = validation_data.reindex(combined_index).fillna(0)
 
         print(summed_probas.corr(validation_data))
-        print(scoring_function(validation_data, summed_probas))
+        score = scoring_function(validation_data, summed_probas)
+        print(score)
 
         residuals = summed_probas - validation_data
-        return residuals
+        return score, residuals
 
 
 class SimpleEnsemble(SimulationChoiceModel):
@@ -1013,6 +1017,9 @@ class SklearnLocationModel:
               alternatives=None, aggregate=False, apply_filter=True,
               choice_function=random_choices):
 
+        if choosers is None or alternatives is None:
+            choosers, alternatives = self.calculate_model_variables()
+
         observed_choices = choosers[self.choice_column]
         predicted_choices = choice_function(self, choosers, alternatives)
 
@@ -1024,7 +1031,7 @@ class SklearnLocationModel:
             observed_choices = observed_choices.value_counts()
             predicted_choices = predicted_choices.value_counts()
 
-        return scoring_function(observed_choices, predicted_choices)
+        return scoring_function(observed_choices.sort_index(), predicted_choices.sort_index())
 
     def summed_probability_score(self):
         choosers, alts = self.calculate_model_variables()
@@ -1046,10 +1053,11 @@ class SklearnLocationModel:
         validation_data = validation_data.reindex(combined_index).fillna(0)
 
         print(summed_probas.corr(validation_data))
-        print(r2_score(validation_data, summed_probas))
+        score = r2_score(validation_data, summed_probas)
+        print(score)
 
         residuals = summed_probas - validation_data
-        return residuals
+        return score, residuals
 
     def calculate_feature_importance(self):
         features_by_importance = []
