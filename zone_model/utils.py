@@ -272,12 +272,6 @@ def full_transition(agents, agent_controls, totals_column, year,
         String indicating the agent_controls column to use for totals.
     year : int
         The year, which will index into the controls
-    settings : dict
-        Contains the configuration for the transition model - is specified
-        down to the yaml level with a "total_column" which specifies the
-        control total and an "add_columns" param which specified which
-        columns to add when calling to_frame (should be a list of the columns
-        needed to do the transition
     location_fname : str
         The field name in the resulting dataframe to set to -1 (to unplace
         new agents)
@@ -315,6 +309,7 @@ def full_transition(agents, agent_controls, totals_column, year,
 
     print("Total agents after transition: {}".format(len(updated)))
     orca.add_table(agents.name, updated[agents.local_columns])
+    return updated, added, copied, removed
 
 
 def update_linked_table(tbl, col_name, added, copied, removed):
@@ -372,6 +367,90 @@ def update_linked_table(tbl, col_name, added, copied, removed):
 
     print('finish: update linked table after transition')
     return pd.concat([table, new_rows])
+
+
+def vacancy_rate_targets(buildings, target_vacancies):
+    """
+    Calculate new unit targets for vacancy rate transition model.
+
+    Parameters
+    ----------
+    buildings : DataFrameWrapper
+        Buildings table dataframe wrapper
+    target_vacancies : DataFrameWrapper
+        Sarget vacancy table wrapper with columns for 'building_type_id',
+        'target_vacancy' proportion, and boolean 'residential'.
+
+    Returns
+    -------
+    bsum : DataFrame
+        Summary table of new units required per building type to meet
+        vacancy rate expectations.
+
+    """
+    b = buildings.to_frame(['building_type_id','residential_units',
+                            'vacant_residential_units','job_spaces',
+                            'vacant_job_spaces'])
+    targets = target_vacancies.to_frame()
+    bsum = b.groupby('building_type_id').sum()
+    bsum['target_vacancy'] = targets.target_vacancy
+    bsum['residential'] = targets.residential
+    bsum['res_vacancy_rate'] = bsum.vacant_residential_units / bsum.residential_units
+    bsum['nonres_vacancy_rate'] = bsum.vacant_job_spaces / bsum.job_spaces
+    bsum['res_target'] = np.round(bsum.residential_units * np.clip((
+        (bsum.target_vacancy - bsum.res_vacancy_rate) + 1), 1, np.inf))
+    bsum['nonres_target'] = np.round(bsum.job_spaces * np.clip((
+        (bsum.target_vacancy - bsum.nonres_vacancy_rate) + 1), 1, np.inf))
+    bsum['new_res'] = bsum.res_target - bsum.residential_units
+    bsum['new_nonres'] = bsum.nonres_target - bsum.job_spaces
+    return bsum[['res_vacancy_rate','nonres_vacancy_rate','target_vacancy',
+                 'new_nonres','new_res','residential']]
+
+
+def vacancy_rate_transition(buildings, target_vacancies,
+                            development_event_history,
+                            developments_table_name):
+    """
+    Sample new development project from a development history table based
+    on target vacancy rates and add them to a developments table.
+
+    Parameters
+    ----------
+    buildings : DataFrameWrapper
+        Buildings table dataframe wrapper
+    target_vacancies : DataFrameWrapper
+        Target vacancy table wrapper with columns for 'building_type_id',
+        'target_vacancy' proportion, and boolean 'residential'.
+    development_event_history : DataFrameWrapper
+        Historical development projects to sample from.
+    developments_table_name : str
+        The name of the developments table to add sampled projects to.
+
+    Returns
+    -------
+    None
+
+    """
+    targets = vacancy_rate_targets(buildings, target_vacancies)
+    dev_events = development_event_history.to_frame()
+    for i, r in targets.iterrows():
+        units = 'residential_units' if r.residential==1 else 'job_spaces'
+        vac = 'res_vacancy_rate' if r.residential==1 else 'nonres_vacancy_rate'
+        target = r['new_res'] if r.residential==1 else r['new_nonres']
+        dev = dev_events.loc[dev_events.building_type_id==i]
+        print("current vacancy for building type {}: {}% " \
+              "target vacancy for building type {}: {}%".format(i, np.round(r[vac] * 100,3),
+                                                               i, np.round(r.target_vacancy * 100,3)))
+        if r.target_vacancy < r[vac]:
+            print("no new {} required".format(units))
+        else:
+            updated, added, copied = transition.add_rows(dev, target, accounting_column=units)
+            print("adding {} developments of type {} with {} {}".format(
+                   len(added), i, updated.loc[added, units].sum(), units))
+            updated = updated[['building_type_id','residential_units','non_residential_sqft']]
+            dev = orca.get_table(developments_table_name).to_frame()
+            dev = pd.concat([dev, updated.loc[added]])
+            orca.add_table(developments_table_name, dev)
 
 
 def record_change_sets(change_type, change_data):
