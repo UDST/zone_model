@@ -17,6 +17,7 @@ from urbansim.models import util
 from urbansim.models import transition
 from urbansim.urbanchoice import interaction
 from urbansim.models import GrowthRateTransition
+from urbansim.models.transition import add_rows
 from urbansim.models import MNLDiscreteChoiceModel
 from urbansim.models.regression import RegressionModel
 
@@ -453,7 +454,7 @@ def vacancy_rate_transition(buildings, target_vacancies,
         if r.target_vacancy < r[vac]:
             print("no new {} required".format(units))
         else:
-            updated, added, copied = transition.add_rows(dev, target, accounting_column=units)
+            updated, added, copied = add_rows(dev, target, accounting_column=units)
             print("adding {} developments of type {} with {} {}".format(
                    len(added), i, updated.loc[added, units].sum(), units))
             updated = updated[['building_type_id','residential_units','non_residential_sqft']]
