@@ -457,9 +457,10 @@ def vacancy_rate_transition(buildings, target_vacancies,
             updated, added, copied = add_rows(dev, target, accounting_column=units)
             print("adding {} developments of type {} with {} {}".format(
                    len(added), i, updated.loc[added, units].sum(), units))
-            updated = updated[['building_type_id','residential_units','non_residential_sqft']]
+            updated = updated[['building_type_id','residential_units','non_residential_sqft','job_spaces']]
+            updated['building_id'] = -1
             dev = orca.get_table(developments_table_name).to_frame()
-            dev = pd.concat([dev, updated.loc[added]])
+            dev = pd.concat([dev, updated.loc[added]]).reset_index(drop=True)
             orca.add_table(developments_table_name, dev)
 
 
@@ -732,6 +733,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
             DataFrame of alternatives.
         """
         columns_used = self.columns_used() + [self.choice_column]
+        columns_used = columns_used + [self.agent_units] if self.agent_units else columns_used
         choosers = orca.get_table(self.choosers).to_frame(columns_used)
 
         supply_column_names = [col for col in
