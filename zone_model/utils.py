@@ -14,9 +14,9 @@ import orca
 from urbansim.utils import misc
 from urbansim.models import dcm
 from urbansim.models import util
-from urbansim.models import transition
+from urbansim.models import transition, relocation
 from urbansim.urbanchoice import interaction
-from urbansim.models import GrowthRateTransition
+from urbansim.models import GrowthRateTransition, RelocationModel
 from urbansim.models.transition import add_rows
 from urbansim.models import MNLDiscreteChoiceModel
 from urbansim.models.regression import RegressionModel
@@ -143,7 +143,7 @@ def unit_choices(model, choosers, alternatives):
                      index=choices.index)
 
 
-def lottery_choices_agent_units(model, choosers, alternatives, max_iter=15):
+def lottery_choices_agent_units(model, choosers, alternatives, max_iter=30):
     """
     Simulate choices using lottery choices.  Alternatives are selected
     iteratively with agent_units respecting capacities until all agents
@@ -161,7 +161,7 @@ def lottery_choices_agent_units(model, choosers, alternatives, max_iter=15):
     choices : pandas.Series
         Mapping of chooser ID to alternative ID.
     """
-
+    
     supply_variable, vacant_variable, agent_units = (model.supply_variable,
                                                      model.vacant_variable,
                                                      model.agent_units)
@@ -175,8 +175,12 @@ def lottery_choices_agent_units(model, choosers, alternatives, max_iter=15):
           .format(len(choosers)),
           "but there are {} overfull alternatives"
           .format(len(vacant_units[vacant_units < 0])))
-
-    choices = model.predict(choosers, alternatives)
+    try:
+        choices = model.predict(choosers, alternatives)
+    except:
+        print("sample size does not match alts sample, \
+               in first iteration")
+        return
     choosers['new_choice_id'] = choices
 
     def vacancy_check(vacant_units, choosers, agent_units):
@@ -189,43 +193,71 @@ def lottery_choices_agent_units(model, choosers, alternatives, max_iter=15):
     iteration = 2
 
     while (len(over) > 0) & (iteration <= max_iter):
-        iteration += 1
-        choose_again = np.array([])
-        for ialt in over.index:
-            idx = choosers.index[choosers.new_choice_id == ialt]
-            units = choosers[agent_units][choosers.new_choice_id == ialt]
-            cap = alternatives[vacant_variable][alternatives.index == ialt]
-            permutate = np.random.permutation(idx.size)
-            csum = units[idx[permutate]].cumsum()
-            draw = idx[permutate[np.where(csum > cap[ialt])]]
-            choose_again = np.concatenate((choose_again, draw))
-        chosen = choosers.loc[~choosers.index.isin(choose_again)]
-        still_choosing = choosers.loc[choosers.index.isin(choose_again)]
-        chosen_sum = chosen.groupby('new_choice_id')[agent_units].sum()
-        unit_check = pd.DataFrame(data={'vac': vacant_units,
-                                        'chosen_sum': chosen_sum})
-        unit_check['new_vacancy'] = (unit_check.vac -
-                                     unit_check.chosen_sum).fillna(
-                                     unit_check.vac)
+        try:
+            iteration += 1
+            choose_again = np.array([])
+            for ialt in over.index:
+                idx = choosers.index[choosers.new_choice_id == ialt]
+                units = choosers[agent_units][choosers.new_choice_id == ialt]
+                cap = alternatives[vacant_variable][alternatives.index == ialt]
+                permutate = np.random.permutation(idx.size)
+                csum = units[idx[permutate]].cumsum()
+                draw = idx[permutate[np.where(csum > cap[ialt])]]
+                choose_again = np.concatenate((choose_again, draw))
+            chosen = choosers.loc[~choosers.index.isin(choose_again)]
+            still_choosing = choosers.loc[choosers.index.isin(choose_again)]
+            chosen_sum = chosen.groupby('new_choice_id')[agent_units].sum()
+            unit_check = pd.DataFrame(data={'vac': vacant_units,
+                                            'chosen_sum': chosen_sum})
+            unit_check['new_vacancy'] = (unit_check.vac -
+                                         unit_check.chosen_sum).fillna(
+                                         unit_check.vac)
 
-        full = unit_check.index[unit_check.new_vacancy <= 1]
-        alternatives = alternatives[~alternatives.index.isin(full)]
-        choices = model.predict(still_choosing, alternatives)
-        choosers.loc[choosers.index.isin(choices.index),
-                     'new_choice_id'] = choices
-        unit_check, over = vacancy_check(vacant_units, choosers, agent_units)
+            full = unit_check.index[unit_check.new_vacancy <= 1]
+            alternatives = alternatives[~alternatives.index.isin(full)]
+            choices = model.predict(still_choosing, alternatives)
+            choosers.loc[choosers.index.isin(choices.index),
+                         'new_choice_id'] = choices
+            unit_check, over = vacancy_check(vacant_units, choosers, agent_units)
+        except:
+            print("sample size does not match alts sample, \
+                   skipping ahead after {} iterations".format(iteration))
+            break
     if len(choosers) > 0:
-        print("Placed {} {} with {} {} in {} iterations"
-              .format(len(chosen), model.choosers,
+        if iteration == 2:
+            chosen = copy.deepcopy(choosers)
+            print("Placed {} {} with {} {} in {} iterations"
+                  .format(len(chosen), model.choosers,
                       chosen[agent_units].sum(), agent_units,
                       iteration-1))
+        else:
+            print("Placed {} {} with {} {} in {} iterations"
+                  .format(len(choosers.loc[choosers.new_choice_id>0]),
+                          model.choosers,
+                          choosers.loc[choosers.new_choice_id>0, agent_units].sum(),
+                          agent_units, iteration-1))
         print("{} unplaced {} remain with {} {}"
-              .format(len(over), model.choosers,
-                      int(choosers.loc[choosers.index.isin(over.index),
+              .format(len(choosers.loc[choosers.new_choice_id.isin(over.index)]),
+                      model.choosers,
+                      int(choosers.loc[choosers.new_choice_id.isin(over.index),
                                        [agent_units]].sum()), agent_units))
 
-    choosers.loc[choosers.index.isin(over.index), 'new_choice_id'] = -1
+    choosers.loc[choosers.new_choice_id.isin(over.index), 'new_choice_id'] = -1
     return choosers.new_choice_id
+
+
+def to_frame(model, table, join_tables,  additional_columns=[]):
+    join_tables = join_tables if isinstance(join_tables, list) else [join_tables]
+    tables = [table] + join_tables
+    tables = [t for t in tables if t is not None]
+    columns = misc.column_list(tables, model.columns_used()) + additional_columns
+
+    if len(tables) > 1:
+        df = orca.merge_tables(target=tables[0].name,
+                               tables=tables, columns=columns)
+    else:
+        df = tables[0].to_frame(columns)
+    return df
 
 
 def simple_transition(tbl, rate, location_fname, set_year_built=False):
@@ -263,6 +295,41 @@ def simple_transition(tbl, rate, location_fname, set_year_built=False):
         df.loc[added, 'year_built'] = orca.get_injectable('year')
 
     orca.add_table(tbl.name, df)
+
+
+def simple_relocation(relocation_rates, choosers, location_column,
+                      probability_column, filter=None):
+    """
+    Unplace agents based on a relocation rates table.
+
+    Parameters
+    ----------
+    relocation_rates : DataFrameWrapper
+        Wrapper of relocation rates table.
+    choosers : DataFrameWrapper
+        Wrapper of table to select from
+    location_column : str
+        String indicating the location column to set to -1.
+    probability_column : str
+        String indicating the name of the probability column
+        in the rates table.
+    filter : str
+        String filter to subset choosers to be sampled. 
+
+    Returns
+    -------
+    Nothing
+    """
+    reloc = RelocationModel(relocation_rates.to_frame(),
+                            probability_column)
+    df = choosers.local
+    if filter:
+        sample_set = df.query(filter)
+    else:
+        sample_set = df
+    idx_reloc = reloc.find_movers(sample_set)
+    df.loc[idx_reloc, location_column] = -1
+    orca.add_table(choosers.name, df)
 
 
 def full_transition(agents, agent_controls, totals_column, year,
@@ -319,7 +386,7 @@ def full_transition(agents, agent_controls, totals_column, year,
 
     print("Total agents after transition: {}".format(len(updated)))
     orca.add_table(agents.name, updated[agents.local_columns])
-    return updated, added, copied, removed
+    return
 
 
 def update_linked_table(tbl, col_name, added, copied, removed):
