@@ -106,7 +106,7 @@ def unit_choices(model, choosers, alternatives):
     if len(choosers) > vacant_units.sum():
         print("WARNING: Not enough locations for movers",
               "reducing locations to size of movers for performance gain")
-        choosers = choosers.head(vacant_units.sum())
+        choosers = choosers.head(int(vacant_units.sum()))
 
     choices = model.predict(choosers, units, debug=True)
 
@@ -132,9 +132,13 @@ def unit_choices(model, choosers, alternatives):
             # units and choosers who need to choose again.
             choices = choices.drop(rechoose.index)
             units_remaining = units.drop(choices.values)
-            choosers = choosers.drop(choices.index)
+            choosers = choosers.drop(choices.index, errors='ignore')
 
             # Agents choose again.
+            if len(units_remaining) < 200:
+                print('Skipping lottery choices:  only %s units remain' % len(units_remaining))
+                return pd.Series(units.loc[choices.values][model.choice_column].values,
+                                 index=choices.index)
             next_choices = model.predict(choosers, units_remaining)
             choices = pd.concat([choices, next_choices])
             chosen_multiple_times = identify_duplicate_choices(choices)
@@ -165,7 +169,8 @@ def lottery_choices_agent_units(model, choosers, alternatives, max_iter=30):
     supply_variable, vacant_variable, agent_units = (model.supply_variable,
                                                      model.vacant_variable,
                                                      model.agent_units)
-
+    alternatives = alternatives[alternatives[vacant_variable] > 0]
+    print('There are %s alternatives with vacancies.' % len(alternatives))
     available_units = alternatives[supply_variable]
     vacant_units = alternatives[vacant_variable]
 
@@ -175,23 +180,23 @@ def lottery_choices_agent_units(model, choosers, alternatives, max_iter=30):
           .format(len(choosers)),
           "but there are {} overfull alternatives"
           .format(len(vacant_units[vacant_units < 0])))
-    try:
-        choices = model.predict(choosers, alternatives)
-    except:
-        print("sample size does not match alts sample, \
-               in first iteration")
-        return
+
+    choices = model.predict(choosers, alternatives)
     choosers['new_choice_id'] = choices
 
     def vacancy_check(vacant_units, choosers, agent_units):
         unit_check = (vacant_units -
                       choosers.groupby('new_choice_id')[agent_units].sum())
         over = unit_check[unit_check < 0]
+        #print('UNIT CHECK')
+        #print(unit_check.describe())
+        #print('OVER')
+        #print(over.describe())
         return unit_check, over
 
     unit_check, over = vacancy_check(vacant_units, choosers, agent_units)
     iteration = 2
-
+    #import pdb; pdb.set_trace()
     while (len(over) > 0) & (iteration <= max_iter):
         try:
             iteration += 1
@@ -241,7 +246,7 @@ def lottery_choices_agent_units(model, choosers, alternatives, max_iter=30):
                       model.choosers,
                       int(choosers.loc[choosers.new_choice_id.isin(over.index),
                                        [agent_units]].sum()), agent_units))
-
+    #import pdb; pdb.set_trace()
     choosers.loc[choosers.new_choice_id.isin(over.index), 'new_choice_id'] = -1
     return choosers.new_choice_id
 
