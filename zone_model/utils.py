@@ -480,6 +480,26 @@ def vacancy_rate_targets(buildings, target_vacancies):
         (bsum.target_vacancy - bsum.nonres_vacancy_rate) + 1), 1, np.inf))
     bsum['new_res'] = bsum.res_target - bsum.residential_units
     bsum['new_nonres'] = bsum.nonres_target - bsum.job_spaces
+
+    households = orca.get_table('households').to_frame(['btype_tenure'])
+    buildings = orca.get_table('buildings').to_frame(['residential_units', 'building_type_id'])
+    target_vacancy1 = .081
+    target_vacancy2 = .081
+    target_vacancy3 = .081
+    target_vacancy4 = .081
+    target_vacancy6 = .097
+    target_vacancies = pd.Series([target_vacancy1,target_vacancy2,target_vacancy3,target_vacancy4,target_vacancy6],index=[1,2,3,4,6])
+    households_by_btype = households.groupby('btype_tenure').size()
+    resunits_by_btype = buildings[buildings.building_type_id < 5].groupby('building_type_id').residential_units.sum()
+    vacant_resunits = resunits_by_btype - households_by_btype
+    vacant_resunits = vacant_resunits[vacant_resunits.index.values<6]
+    target_vacant_resunits = resunits_by_btype * target_vacancies
+    diff_resunits = np.round(target_vacant_resunits - vacant_resunits)
+    diff_resunits[diff_resunits < 0] = 0.0
+    print('diff_resunits:')
+    print(diff_resunits)
+    bsum['new_res'] = diff_resunits
+
     return bsum[['res_vacancy_rate','nonres_vacancy_rate','target_vacancy',
                  'new_nonres','new_res','residential']]
 
