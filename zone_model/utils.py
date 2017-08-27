@@ -18,8 +18,17 @@ from urbansim.models import transition, relocation
 from urbansim.urbanchoice import interaction
 from urbansim.models import GrowthRateTransition, RelocationModel
 from urbansim.models.transition import add_rows
-from urbansim.models import MNLDiscreteChoiceModel
 from urbansim.models.regression import RegressionModel
+
+
+#from urbansim.models import MNLDiscreteChoiceModel
+
+
+def equal(a, b):
+    return (a == b).astype('int')
+
+from urbansim.models import dcm
+dcm.equal = equal
 
 
 def random_choices(model, choosers, alternatives):
@@ -680,7 +689,7 @@ def register_choice_model_step(model_name, agents_name, choice_function):
     return choice_model_simulate
 
 
-class SimulationChoiceModel(MNLDiscreteChoiceModel):
+class SimulationChoiceModel(dcm.MNLDiscreteChoiceModel):
     """
     A discrete choice model with parameters needed for simulation.
     Initialize with MNLDiscreteChoiceModel's init parameters or with from_yaml,
@@ -690,7 +699,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
     def set_simulation_params(self, name, supply_variable, vacant_variable,
                               choosers, alternatives, choice_column=None,
                               summary_alts_xref=None, merge_tables=None,
-                              agent_units=None):
+                              agent_units=None, calibration_variables=None):
         """
         Add simulation parameters as additional attributes.
         Parameters
@@ -731,6 +740,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         self.agent_units = agent_units
         self.choice_column = choice_column if choice_column is not None \
             else self.choice_column
+        self.calibration_variables = calibration_variables
 
     def simulate(self, choice_function=None, save_probabilities=False,
                  **kwargs):
@@ -755,6 +765,21 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
             will map to a nan value when there are not enough alternatives
             for all the choosers.
         """
+        if 'calibrated' in orca.list_injectables():
+            if orca.get_injectable('calibrated') & (self.calibration_variables is not None):
+                for calib_var in self.calibration_variables:
+                    if calib_var not in self.model_expression:
+                        self.model_expression.append(calib_var)
+                        
+                    if calib_var not in self.fit_parameters.index:
+                        print('Adding calib coeffs!!')
+                        coeff = orca.get_injectable('_'.join([self.name,
+                                                              calib_var]))
+                        to_add = {'Coefficient':float(coeff), 'Std. Error':0.0, 
+                                                           'T-Score':0.0}
+                        to_add = pd.Series(to_add, name=calib_var)
+                        self.fit_parameters = self.fit_parameters.append(to_add)
+
         choosers, alternatives = self.calculate_model_variables()
 
         choosers, alternatives = self.apply_predict_filters(
@@ -764,7 +789,8 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         # in the choice column
         choosers = choosers[choosers[self.choice_column] == -1]
         print("{} agents are making a choice.".format(len(choosers)))
-
+        #if self.name == 'elcm1':
+        #    import pdb; pdb.set_trace()
         if choice_function:
             choices = choice_function(self, choosers, alternatives, **kwargs)
         else:
