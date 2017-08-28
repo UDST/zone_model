@@ -768,16 +768,17 @@ class SimulationChoiceModel(dcm.MNLDiscreteChoiceModel):
         if 'calibrated' in orca.list_injectables():
             if orca.get_injectable('calibrated') & (self.calibration_variables is not None):
                 for calib_var in self.calibration_variables:
-                    if calib_var not in self.model_expression:
-                        self.model_expression.append(calib_var)
+                    calib_var_name = calib_var.replace('_x_', ':')
+                    if calib_var_name not in self.model_expression:
+                        self.model_expression.append(calib_var_name)
                         
-                    if calib_var not in self.fit_parameters.index:
-                        print('Adding calib coeffs!!')
+                    if calib_var_name not in self.fit_parameters.index:
+                        print('Adding calib coeffs: %s' % calib_var_name)
                         coeff = orca.get_injectable('_'.join([self.name,
                                                               calib_var]))
                         to_add = {'Coefficient':float(coeff), 'Std. Error':0.0, 
                                                            'T-Score':0.0}
-                        to_add = pd.Series(to_add, name=calib_var)
+                        to_add = pd.Series(to_add, name=calib_var_name)
                         self.fit_parameters = self.fit_parameters.append(to_add)
 
         choosers, alternatives = self.calculate_model_variables()
