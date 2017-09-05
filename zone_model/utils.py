@@ -497,11 +497,11 @@ def vacancy_rate_targets(buildings, target_vacancies):
 
     households = orca.get_table('households').to_frame(['btype_tenure'])
     buildings = orca.get_table('buildings').to_frame(['residential_units', 'building_type_id'])
-    target_vacancy1 = .081
-    target_vacancy2 = .081
-    target_vacancy3 = .081
-    target_vacancy4 = .081
-    target_vacancy6 = .097
+    target_vacancy1 = .11
+    target_vacancy2 = .11
+    target_vacancy3 = .11
+    target_vacancy4 = .11
+    target_vacancy6 = .14
     target_vacancies = pd.Series([target_vacancy1,target_vacancy2,target_vacancy3,target_vacancy4,target_vacancy6],index=[1,2,3,4,6])
     households_by_btype = households.groupby('btype_tenure').size()
     resunits_by_btype = buildings[buildings.building_type_id < 5].groupby('building_type_id').residential_units.sum()
