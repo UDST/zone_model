@@ -381,7 +381,7 @@ def full_transition(agents, agent_controls, totals_column, year,
     Nothing
     """
     ct = agent_controls.to_frame()
-    agnt = agents.to_frame(agents.local_columns)
+    agnt = agents.to_frame()
     print("Total agents before transition: {}".format(len(agnt)))
     tran = transition.TabularTotalsTransition(ct, totals_column,
                                               accounting_column)
