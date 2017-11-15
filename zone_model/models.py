@@ -32,24 +32,3 @@ def simple_hlcm_ensemble(households, location_choice_models):
     choices = model.simulate(choice_function=utils.random_choices)
 
     households.update_col_from_series('zone_id', choices)
-
-
-'''
-try:
-    from google.cloud import datastore
-    client = datastore.Client()
-except:
-    pass
-
-def get_selected_models_by_version(model_version_id):
-    """
-    Get model configs from Cloud Datastore.
-    """
-    query = client.query(kind='Spec')
-    query.add_filter('run_id', '=', model_version_id)
-    query.add_filter('selected', '=', True)
-    return list(query.fetch())
-
-models_version_id = '70320150328dnh'  ## TODO: pull this into config file
-models = get_selected_models_by_version(models_version_id)
-'''
