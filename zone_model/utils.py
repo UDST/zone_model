@@ -300,7 +300,7 @@ def full_transition(agents, agent_controls, totals_column, year,
     Nothing
     """
     ct = agent_controls.to_frame()
-    agnt = agents.to_frame(agents.local_columns)
+    agnt = agents.to_frame()
     print("Total agents before transition: {}".format(len(agnt)))
     tran = transition.TabularTotalsTransition(ct, totals_column,
                                               accounting_column)
@@ -585,6 +585,25 @@ def register_choice_model_step(model_name, agents_name, choice_function):
             model.choice_column, choices, cast=True)
 
     return choice_model_simulate
+
+
+def register_regression_model_step(model_name):
+
+    @orca.step(model_name)
+    def regression_model_simulate(regression_models):
+        model = regression_models[model_name]
+        dataset_name = model.observations_name
+        df = orca.get_table(dataset_name).to_frame(model.columns_used())
+
+        predictions = model.predict(df)
+
+        print('Summary of model predictions for {}: {}'
+              .format(model_name, predictions.describe()))
+
+        orca.get_table(dataset_name).update_col_from_series(
+                                      model.dep_var, predictions, cast=True)
+
+    return regression_model_simulate
 
 
 class SimulationChoiceModel(MNLDiscreteChoiceModel):
@@ -1276,4 +1295,20 @@ def create_lcm_from_config(config_filename, model_attributes):
                                 choice_column=choice_column,
                                 merge_tables=merge_tables,
                                 agent_units=agent_units)
+    return model
+
+
+def create_rm_from_config(config_filename, model_attributes):
+    """
+    For a given model config filename and dictionary of model category
+    attributes, instantiate a SimulationChoiceModel object.
+    """
+    model_name = config_filename.split('.')[0]
+    model = RegressionModel.from_yaml(
+        str_or_buffer=misc.config(config_filename))
+    dep_var = [dvar for dvar in model_attributes['dep_var'] if 
+               dvar in config_filename][0]
+    model.name = model_name
+    model.dep_var = dep_var
+    model.observations_name = model_attributes['observations_name']
     return model
