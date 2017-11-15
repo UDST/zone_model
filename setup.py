@@ -19,7 +19,7 @@ setup(
     long_description=long_description,
     author='UrbanSim Inc.',
     author_email='info@urbansim.com',
-    url='https://github.com/urbansim/zone_model',
+    url='https://github.com/udst/zone_model',
     classifiers=[
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
