@@ -106,7 +106,8 @@ def unit_choices(model, choosers, alternatives):
     if len(choosers) > vacant_units.sum():
         print("WARNING: Not enough locations for movers",
               "reducing locations to size of movers for performance gain")
-        choosers = choosers.head(vacant_units.sum())
+        return None
+        #choosers = choosers.head(vacant_units.sum())
 
     choices = model.predict(choosers, units, debug=True)
 
@@ -578,7 +579,10 @@ def register_choice_model_step(model_name, agents_name, choice_function):
 
         choices = model.simulate(choice_function=choice_function)
 
-        print('There are {} unplaced agents.'
+        if choices is None:
+            return
+        else:
+            print('There are {} unplaced agents.'
               .format(choices.isnull().sum()))
 
         orca.get_table(agents_name).update_col_from_series(
