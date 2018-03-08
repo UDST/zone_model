@@ -620,7 +620,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
     def set_simulation_params(self, name, supply_variable, vacant_variable,
                               choosers, alternatives, choice_column=None,
                               summary_alts_xref=None, merge_tables=None,
-                              agent_units=None):
+                              agent_units=None, calibrated=False):
         """
         Add simulation parameters as additional attributes.
         Parameters
@@ -661,6 +661,34 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         self.agent_units = agent_units
         self.choice_column = choice_column if choice_column is not None \
             else self.choice_column
+        self.calibrated = calibrated
+
+
+    def set_calibration_variables(self, calib_variables):
+        """
+        Update model expression and fit parameters with calibrated variables.
+        Parameters
+        ----------
+        calib_variables : dict
+            Mapping between variable name and coefficient.
+        Returns
+        -------
+        None
+        """
+        self.calibrated = True
+        for calib_var in calib_variables.keys():
+            calib_var_name = calib_var.replace('_x_', ':')
+            if calib_var_name not in self.model_expression:
+                #self.model_expression.append(calib_var_name)
+                self.model_expression.add(calib_var_name)
+                print('Adding calib coeffs: %s' % calib_var_name)
+                coeff = float(calib_variables[calib_var])
+
+                to_add = {'Coefficient':coeff, 'Std. Error':0.0, 
+                                                  'T-Score':0.0}
+                to_add = pd.Series(to_add, name=calib_var_name)
+                self.fit_parameters = self.fit_parameters.append(to_add)
+
 
     def simulate(self, choice_function=None, save_probabilities=False,
                  **kwargs):
