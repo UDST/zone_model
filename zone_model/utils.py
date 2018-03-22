@@ -752,7 +752,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         self.fit(choosers, alternatives, choosers[self.choice_column])
         return self.log_likelihoods, self.fit_parameters
 
-    def calculate_probabilities(self, choosers, alternatives):
+    def calculate_probabilities(self, choosers=None, alternatives=None):
         """
         Calculate model probabilities.
         Parameters
@@ -766,6 +766,9 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         probabilities : pandas.Series
             Mapping of alternative ID to probabilities.
         """
+        if choosers is None or alternatives is None:
+            choosers, alternatives = self.calculate_model_variables()
+
         probabilities = self.probabilities(choosers, alternatives)
         probabilities = probabilities.reset_index().set_index(
             'alternative_id')[0]  # remove chooser_id col from idx
