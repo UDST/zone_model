@@ -620,7 +620,8 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
     def set_simulation_params(self, name, supply_variable, vacant_variable,
                               choosers, alternatives, choice_column=None,
                               summary_alts_xref=None, merge_tables=None,
-                              agent_units=None, calibrated=False):
+                              agent_units=None, calibrated=False,
+                              min_chooser_cols=False):
         """
         Add simulation parameters as additional attributes.
         Parameters
@@ -647,6 +648,11 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         agent_units : str, optional
             Name of the column in the choosers table that designates how
             much supply is occupied by each chooser.
+        calibrated : bool, optional
+            Indicates whether or not model includes calibrated coefficients.
+        min_chooser_cols : bool, optional
+            Indicates whether to calculate minimum choose variables.  Note that
+            this precludes some chooser * alternative interaction variables.
         Returns
         -------
         None
@@ -662,6 +668,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         self.choice_column = choice_column if choice_column is not None \
             else self.choice_column
         self.calibrated = calibrated
+        self.min_chooser_cols = min_chooser_cols
 
 
     def set_calibration_variables(self, calib_variables):
@@ -713,6 +720,16 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
             will map to a nan value when there are not enough alternatives
             for all the choosers.
         """
+        # If there are no choosers, return None without simulating
+        chooser_cols = self.choosers_columns_used()
+        chooser_cols.append(self.choice_column)
+        choosers = orca.get_table(self.choosers).to_frame(chooser_cols)
+        choosers = choosers.query(self.choosers_predict_filters)
+        choice_col_check = choosers[self.choice_column]
+        if (choice_col_check == -1).sum() == 0:
+            print('There are no choosers for model {}.'.format(self.name))
+            return None
+
         choosers, alternatives = self.calculate_model_variables()
 
         choosers, alternatives = self.apply_predict_filters(
@@ -786,7 +803,13 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
             DataFrame of alternatives.
         """
         columns_used = self.columns_used() + [self.choice_column]
-        choosers = orca.get_table(self.choosers).to_frame(columns_used)
+
+        if self.min_chooser_cols:
+            chooser_cols = self.choosers_columns_used()
+            chooser_cols.append(self.choice_column)
+            choosers = orca.get_table(self.choosers).to_frame(chooser_cols)
+        else:
+            choosers = orca.get_table(self.choosers).to_frame(columns_used)
 
         supply_column_names = [col for col in
                                [self.supply_variable, self.vacant_variable]
