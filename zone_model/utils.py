@@ -953,7 +953,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         print(score)
 
         residuals = summed_probas - validation_data
-return score, residuals
+        return score, residuals
 
 
 class SimpleEnsemble(SimulationChoiceModel):
