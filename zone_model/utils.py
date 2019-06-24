@@ -578,12 +578,11 @@ def register_choice_model_step(model_name, agents_name, choice_function):
 
         choices = model.simulate(choice_function=choice_function)
 
-        print('There are {} unplaced agents.'
-              .format(choices.isnull().sum()))
-
-        orca.get_table(agents_name).update_col_from_series(
-            model.choice_column, choices, cast=True)
-
+        # Test if the simulation was performed
+        if not (choices is None):
+            print('There are {} unplaced agents.'.format(choices.isnull().sum()))
+            orca.get_table(agents_name).update_col_from_series(
+                    model.choice_column, choices, cast=True)
     return choice_model_simulate
 
 
@@ -685,7 +684,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
                 print('Adding calib coeffs: %s' % calib_var_name)
                 coeff = float(calib_variables[calib_var])
 
-                to_add = {'Coefficient':coeff, 'Std. Error':0.0, 
+                to_add = {'Coefficient':coeff, 'Std. Error':0.0,
                                                   'T-Score':0.0}
                 to_add = pd.Series(to_add, name=calib_var_name)
                 self.fit_parameters = self.fit_parameters.append(to_add)
@@ -1358,7 +1357,7 @@ def create_rm_from_config(config_filename, model_attributes):
     model_name = config_filename.split('.')[0]
     model = RegressionModel.from_yaml(
         str_or_buffer=misc.config(config_filename))
-    dep_var = [dvar for dvar in model_attributes['dep_var'] if 
+    dep_var = [dvar for dvar in model_attributes['dep_var'] if
                dvar in config_filename][0]
     model.name = model_name
     model.dep_var = dep_var
