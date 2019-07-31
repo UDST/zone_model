@@ -70,7 +70,7 @@ def unit_choices(model, choosers, alternatives):
     available_units = alternatives[supply_variable]
     vacant_units = alternatives[vacant_variable]
     # must have positive index
-    vacant_units = vacant_units[vacant_units.index.values >= 0]
+    vacant_units = vacant_units[vacant_units.index.values.astype('float') >= 0]
 
     print("There are {} total available units"
           .format(available_units.sum()),
