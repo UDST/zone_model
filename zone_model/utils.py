@@ -185,6 +185,8 @@ def lottery_choices_agent_units(model, choosers, alternatives, max_iter=15):
         over = unit_check[unit_check < 0]
         return unit_check, over
 
+    choosers[model.agent_units] = orca.get_table(model.choosers).to_frame(
+        model.agent_units)
     unit_check, over = vacancy_check(vacant_units, choosers, agent_units)
     iteration = 2
 
@@ -737,6 +739,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
             choices = choice_function(self, choosers, alternatives, **kwargs)
         else:
             choices = self.predict(choosers, alternatives, debug=True)
+
 
         if save_probabilities:
             if not self.sim_pdf:
