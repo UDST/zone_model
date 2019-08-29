@@ -311,7 +311,7 @@ def full_transition(agents, agent_controls, totals_column, year,
 
     updated_links = {}
     if linked_tables:
-        for table_name, (table, col) in linked_tables.iteritems():
+        for table_name, (table, col) in linked_tables.items():
             print('updating linked table {}'.format(table_name))
             updated_links[table_name] = \
                 update_linked_table(table, col, added, copied, removed)
