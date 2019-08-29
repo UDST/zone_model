@@ -185,8 +185,6 @@ def lottery_choices_agent_units(model, choosers, alternatives, max_iter=15):
         over = unit_check[unit_check < 0]
         return unit_check, over
 
-    choosers[model.agent_units] = orca.get_table(model.choosers).to_frame(
-        model.agent_units)
     unit_check, over = vacancy_check(vacant_units, choosers, agent_units)
     iteration = 2
 
@@ -313,7 +311,7 @@ def full_transition(agents, agent_controls, totals_column, year,
 
     updated_links = {}
     if linked_tables:
-        for table_name, (table, col) in linked_tables.iteritems():
+        for table_name, (table, col) in linked_tables.items():
             print('updating linked table {}'.format(table_name))
             updated_links[table_name] = \
                 update_linked_table(table, col, added, copied, removed)
@@ -739,7 +737,6 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
             choices = choice_function(self, choosers, alternatives, **kwargs)
         else:
             choices = self.predict(choosers, alternatives, debug=True)
-
 
         if save_probabilities:
             if not self.sim_pdf:
