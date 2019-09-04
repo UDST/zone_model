@@ -20,6 +20,7 @@ from urbansim.models import GrowthRateTransition
 from urbansim.models.transition import add_rows
 from urbansim.models import MNLDiscreteChoiceModel
 from urbansim.models.regression import RegressionModel
+from urbansim.models.supplydemand import supply_and_demand
 
 
 def random_choices(model, choosers, alternatives):
@@ -46,7 +47,7 @@ def random_choices(model, choosers, alternatives):
     return pd.Series(choices, index=choosers.index)
 
 
-def unit_choices(model, choosers, alternatives):
+def unit_choices(model, choosers, alternatives, enable_supply_correction=None):
     """
     Simulate choices using unit choice.  Alternatives table is expanded
     to be of length alternatives.vacant_variables, then choices are simulated
@@ -59,6 +60,11 @@ def unit_choices(model, choosers, alternatives):
         DataFrame of choosers.
     alternatives : pandas.DataFrame
         DataFrame of alternatives.
+    enable_supply_correction : dict, optional
+        Dictionary with parameters for supply-demand price equilibration.
+        Must contain keys "price_col" and "submarket_col" which are set to
+        the column names in the zones table which contain the column for
+        prices and an identifier which segments zones into submarkets
     Returns
     -------
     choices : pandas.Series
@@ -66,7 +72,15 @@ def unit_choices(model, choosers, alternatives):
     """
     supply_variable, vacant_variable = (model.supply_variable,
                                         model.vacant_variable)
-
+    additional_columns = ['zone_id',supply_variable, vacant_variable]
+    if enable_supply_correction is not None \
+            and "submarket_col" in enable_supply_correction:
+        additional_columns += [enable_supply_correction["submarket_col"]]
+    if enable_supply_correction is not None\
+            and "price_col" in enable_supply_correction:
+        additional_columns += [enable_supply_correction["price_col"]]
+    alternatives = orca.get_table('zones')\
+        .to_frame(alternatives.columns.tolist() + additional_columns)
     available_units = alternatives[supply_variable]
     vacant_units = alternatives[vacant_variable]
     # must have positive index
@@ -103,6 +117,55 @@ def unit_choices(model, choosers, alternatives):
 
     print("There are {} total movers for this LCM".format(len(choosers)))
 
+    if enable_supply_correction is not None:
+        assert isinstance(enable_supply_correction, dict)
+        assert "price_col" in enable_supply_correction
+        price_col = enable_supply_correction["price_col"]
+        assert "submarket_col" in enable_supply_correction
+        submarket_col = enable_supply_correction["submarket_col"]
+
+        if enable_supply_correction.get("warm_start", False) is True:
+            raise NotImplementedError()
+
+        multiplier_func = enable_supply_correction.get("multiplier_func", None)
+        if multiplier_func is not None:
+            multiplier_func = orca.get_injectable(multiplier_func)
+
+        kwargs = enable_supply_correction.get('kwargs', {})
+        model.summary_alts_xref = units[submarket_col]
+        new_prices, submarkets_ratios = supply_and_demand(
+            model,
+            choosers,
+            units,
+            submarket_col,
+            price_col,
+            base_multiplier=None,
+            multiplier_func=multiplier_func,
+            **kwargs)
+
+
+        submarket_table = enable_supply_correction.get("submarket_table", None)
+        if submarket_table is not None:
+            submarkets_ratios = submarkets_ratios.reindex(
+                orca.get_table(submarket_table).index).fillna(1)
+            # write final shifters to the submarket_table for use in debugging
+            orca.get_table(submarket_table)["price_shifters"] = submarkets_ratios
+
+        print ("Running supply and demand")
+        print ("Simulated Prices")
+        print (units[price_col].describe())
+        print ("Submarket Price Shifters")
+        print (submarkets_ratios.describe())
+        units[price_col] = units[price_col] * submarkets_ratios.loc[units[submarket_col]].values
+        prices = units.groupby('zone_id')[price_col].min().reset_index()
+        alternatives = alternatives.rename(columns={price_col: price_col+"_hedonic"})
+        alternatives = alternatives.merge(prices, on='zone_id', how='left').set_index('zone_id')
+        alternatives.loc[alternatives[price_col].isnull(), price_col] = alternatives[price_col+"_hedonic"]
+        orca.add_column('zones', price_col+"_hedonic", alternatives[price_col+"_hedonic"])
+        orca.add_column('zones', price_col , alternatives[price_col])
+        print ("Adjusted Prices")
+        print (alternatives[price_col].describe())
+
     if len(choosers) > vacant_units.sum():
         print("WARNING: Not enough locations for movers",
               "reducing locations to size of movers for performance gain")
@@ -138,6 +201,16 @@ def unit_choices(model, choosers, alternatives):
             next_choices = model.predict(choosers, units_remaining)
             choices = pd.concat([choices, next_choices])
             chosen_multiple_times = identify_duplicate_choices(choices)
+
+    if enable_supply_correction is not None:
+        new_prices = alternatives[price_col]
+        if "clip_final_price_low" in enable_supply_correction:
+            new_prices = new_prices.clip(lower=enable_supply_correction[
+                "clip_final_price_low"])
+        if "clipal_final_price_high" in enable_supply_correction:
+            new_prices = new_prices.clip(upper=enable_supply_correction[
+                "clip_final_price_high"])
+        orca.add_column('zones', price_col, new_prices)
 
     return pd.Series(units.loc[choices.values][model.choice_column].values,
                      index=choices.index)
@@ -570,13 +643,14 @@ def register_simple_transition_model(agents_name, growth_rate):
     return simple_transition_model
 
 
-def register_choice_model_step(model_name, agents_name, choice_function):
+def register_choice_model_step(model_name, agents_name, choice_function, enable_supply_correction=None):
 
     @orca.step(model_name)
     def choice_model_simulate(location_choice_models):
         model = location_choice_models[model_name]
 
-        choices = model.simulate(choice_function=choice_function)
+        choices = model.simulate(choice_function=choice_function,
+                                 enable_supply_correction=enable_supply_correction)
 
         # Test if the simulation was performed
         if not (choices is None):
@@ -615,7 +689,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
                               choosers, alternatives, choice_column=None,
                               summary_alts_xref=None, merge_tables=None,
                               agent_units=None, calibrated=False,
-                              min_chooser_cols=False):
+                              min_chooser_cols=False, equilibration=False):
         """
         Add simulation parameters as additional attributes.
         Parameters
@@ -647,6 +721,9 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         min_chooser_cols : bool, optional
             Indicates whether to calculate minimum choose variables.  Note that
             this precludes some chooser * alternative interaction variables.
+        equilibration : bool, optional
+            Indicates whether supply-demand price equilibration should be
+            applied to the model.
         Returns
         -------
         None
@@ -663,6 +740,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
             else self.choice_column
         self.calibrated = calibrated
         self.min_chooser_cols = min_chooser_cols
+        self.equilibration = equilibration
 
 
     def set_calibration_variables(self, calib_variables):
@@ -886,7 +964,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
 
     def summed_probabilities(self, choosers=None, alternatives=None):
         """
-        Sum probabilities to the summary geography level.
+       Calculate probabilities by alternative and multiply by length of choosers.
         """
         if choosers is None or alternatives is None:
             choosers, alternatives = self.calculate_model_variables()
@@ -900,9 +978,8 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         choosers['summary_id'] = choosers[self.choice_column]
         choosers.summary_id = choosers.summary_id.map(self.summary_alts_xref)
         probs = self.calculate_probabilities(choosers, alternatives)
-        probs = probs.reset_index().rename(columns={0: 'proba'})
-        probs['summary_id'] = probs.alternative_id.map(self.summary_alts_xref)
-        return probs.groupby('summary_id').proba.sum()
+        return probs*len(choosers)
+
 
     def observed_distribution(self, choosers=None):
         """
@@ -937,7 +1014,10 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         if self.choosers_predict_filters:
             choosers = choosers.query(self.choosers_predict_filters)
 
-        summed_probas = self.summed_probabilities(choosers, alternatives)
+        probs = self.summed_probabilities(choosers, alternatives)/len(choosers)
+        probs = probs.reset_index().rename(columns={0: 'proba'})
+        probs['summary_id'] = probs.alternative_id.map(self.summary_alts_xref)
+        summed_probas = probs.groupby('summary_id').proba.sum()
 
         if validation_data is None:
             validation_data = self.observed_distribution(choosers)
@@ -1323,10 +1403,13 @@ def get_model_category_configs():
     return model_category_configs
 
 
-def create_lcm_from_config(config_filename, model_attributes):
+def create_lcm_from_config(config_filename, model_attributes, summary_alts_xref=None):
     """
     For a given model config filename and dictionary of model category
     attributes, instantiate a SimulationChoiceModel object.
+    summary_alts_xref is an optional pd.Series parameter that maps
+    alternatives' ids with submarket categories for supply-demand
+    price equilibration.
     """
     model_name = config_filename.split('.')[0]
     model = SimulationChoiceModel.from_yaml(
@@ -1338,6 +1421,7 @@ def create_lcm_from_config(config_filename, model_attributes):
     choice_column = model_attributes['alternatives_id_name'] \
         if model.choice_column is None and 'alternatives_id_name' \
         in model_attributes else None
+    equilibration = model_attributes['equilibration'] if 'equilibration' in model_attributes else False
     model.set_simulation_params(model_name,
                                 model_attributes['supply_variable'],
                                 model_attributes['vacant_variable'],
@@ -1345,7 +1429,9 @@ def create_lcm_from_config(config_filename, model_attributes):
                                 model_attributes['alternatives_name'],
                                 choice_column=choice_column,
                                 merge_tables=merge_tables,
-                                agent_units=agent_units)
+                                agent_units=agent_units,
+                                summary_alts_xref=summary_alts_xref,
+                                equilibration=equilibration)
     return model
 
 
