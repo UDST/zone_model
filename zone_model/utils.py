@@ -643,13 +643,14 @@ def register_simple_transition_model(agents_name, growth_rate):
     return simple_transition_model
 
 
-def register_choice_model_step(model_name, agents_name, choice_function):
+def register_choice_model_step(model_name, agents_name, choice_function, enable_supply_correction=None):
 
     @orca.step(model_name)
     def choice_model_simulate(location_choice_models):
         model = location_choice_models[model_name]
 
-        choices = model.simulate(choice_function=choice_function)
+        choices = model.simulate(choice_function=choice_function,
+                                 enable_supply_correction=enable_supply_correction)
 
         # Test if the simulation was performed
         if not (choices is None):
