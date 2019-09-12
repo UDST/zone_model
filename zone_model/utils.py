@@ -79,8 +79,9 @@ def unit_choices(model, choosers, alternatives, enable_supply_correction=None):
     if enable_supply_correction is not None\
             and "price_col" in enable_supply_correction:
         additional_columns += [enable_supply_correction["price_col"]]
-    alternatives = orca.get_table('zones')\
-        .to_frame(alternatives.columns.tolist() + additional_columns)
+    if enable_supply_correction is not None:
+        alternatives = orca.get_table('zones')\
+            .to_frame(alternatives.columns.tolist() + additional_columns)
     available_units = alternatives[supply_variable]
     vacant_units = alternatives[vacant_variable]
     # must have positive index
