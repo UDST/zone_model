@@ -170,7 +170,7 @@ def unit_choices(model, choosers, alternatives, enable_supply_correction=None):
     if len(choosers) > vacant_units.sum():
         print("WARNING: Not enough locations for movers",
               "reducing locations to size of movers for performance gain")
-        choosers = choosers.head(vacant_units.sum())
+        choosers = choosers.head(int(vacant_units.sum()))
 
     choices = model.predict(choosers, units, debug=True)
 
