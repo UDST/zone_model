@@ -963,9 +963,9 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
 
         return scoring_function(observed_choices, predicted_choices)
 
-    def summed_probabilities(self, choosers=None, alternatives=None):
+    def summed_probabilities_for_score(self, choosers=None, alternatives=None):
         """
-       Calculate probabilities by alternative and multiply by length of choosers.
+        Sum probabilities to the summary geography level.
         """
         if choosers is None or alternatives is None:
             choosers, alternatives = self.calculate_model_variables()
@@ -979,7 +979,13 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         choosers['summary_id'] = choosers[self.choice_column]
         choosers.summary_id = choosers.summary_id.map(self.summary_alts_xref)
         probs = self.calculate_probabilities(choosers, alternatives)
-        return probs*len(choosers)
+        probs = probs.reset_index().rename(columns={0: 'proba'})
+        probs['summary_id'] = probs.alternative_id.map(self.summary_alts_xref)
+        return probs.groupby('summary_id').proba.sum()
+
+    def summed_probabilities(self, choosers=None, alternatives=None):
+        summed_probas = dcm.MNLDiscreteChoiceModel.summed_probabilities(self, choosers, alternatives)
+        return summed_probas
 
 
     def observed_distribution(self, choosers=None):
@@ -1015,10 +1021,7 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         if self.choosers_predict_filters:
             choosers = choosers.query(self.choosers_predict_filters)
 
-        probs = self.summed_probabilities(choosers, alternatives)/len(choosers)
-        probs = probs.reset_index().rename(columns={0: 'proba'})
-        probs['summary_id'] = probs.alternative_id.map(self.summary_alts_xref)
-        summed_probas = probs.groupby('summary_id').proba.sum()
+        summed_probas = self.summed_probabilities_for_score(choosers, alternatives)
 
         if validation_data is None:
             validation_data = self.observed_distribution(choosers)
