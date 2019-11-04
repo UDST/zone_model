@@ -47,7 +47,8 @@ def random_choices(model, choosers, alternatives):
     return pd.Series(choices, index=choosers.index)
 
 
-def unit_choices(model, choosers, alternatives, enable_supply_correction=None):
+def unit_choices(model, choosers, alternatives, enable_supply_correction=None,
+                 zones_as_alternatives=False):
     """
     Simulate choices using unit choice.  Alternatives table is expanded
     to be of length alternatives.vacant_variables, then choices are simulated
@@ -171,8 +172,10 @@ def unit_choices(model, choosers, alternatives, enable_supply_correction=None):
         print("WARNING: Not enough locations for movers",
               "reducing locations to size of movers for performance gain")
         choosers = choosers.head(int(vacant_units.sum()))
-
-    choices = model.predict(choosers, units, debug=True)
+    if zones_as_alternatives==True:
+        choices = choose_with_zones_as_alternatives(model, choosers, units)
+    else:
+        choices = model.predict(choosers, units, debug=True)
 
     def identify_duplicate_choices(choices):
         choice_counts = choices.value_counts()
@@ -216,6 +219,29 @@ def unit_choices(model, choosers, alternatives, enable_supply_correction=None):
     return pd.Series(units.loc[choices.values][model.choice_column].values,
                      index=choices.index)
 
+def choose_with_zones_as_alternatives(model, choosers, units):
+    model.predict(choosers, units, debug=True)
+    orig_probas = model.sim_pdf.reset_index()
+    orig_probas = orig_probas.rename(columns={0: 'orig_prob'})
+    choosers, units = model.apply_predict_filters(choosers, units)
+    units.index.names = ['alternative_id']
+    orig_probas = orig_probas.merge(
+        units[['zone_id']].reset_index(), on='alternative_id', how='left')
+    alts_per_zone = orig_probas.groupby('zone_id')['alternative_id'].count().reset_index()
+    alts_per_zone = alts_per_zone.rename(columns={'alternative_id': 'alts_zone'})
+    orig_probas = orig_probas.merge(alts_per_zone, on='zone_id', how='left')
+    units_ = units.groupby('zone_id').min().reset_index()
+    choosers_ = choosers.iloc[:1, :]
+    model.predict(choosers_, units_.set_index('zone_id'), debug=True)
+    agg_probas = model.sim_pdf.reset_index()
+    agg_probas = agg_probas.rename(
+        columns={'alternative_id': 'zone_id', 0: 'agg_prob'})
+    probas = orig_probas.merge(agg_probas, on='zone_id', how='left')
+    probas['probability'] = probas['agg_prob'] / probas['alts_zone']
+    choices = dcm.unit_choice(choosers.index.values,
+                              probas.alternative_id.values,
+                              probas.probability.values)
+    return choices
 
 def lottery_choices_agent_units(model, choosers, alternatives, max_iter=15):
     """
@@ -644,14 +670,17 @@ def register_simple_transition_model(agents_name, growth_rate):
     return simple_transition_model
 
 
-def register_choice_model_step(model_name, agents_name, choice_function, enable_supply_correction=None):
+def register_choice_model_step(model_name, agents_name, choice_function,
+                               enable_supply_correction=None,
+                               zones_as_alternatives=False):
 
     @orca.step(model_name)
     def choice_model_simulate(location_choice_models):
         model = location_choice_models[model_name]
 
         choices = model.simulate(choice_function=choice_function,
-                                 enable_supply_correction=enable_supply_correction)
+                                 enable_supply_correction=enable_supply_correction,
+                                 zones_as_alternatives=zones_as_alternatives)
 
         # Test if the simulation was performed
         if not (choices is None):
