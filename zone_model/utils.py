@@ -788,7 +788,10 @@ class SimulationChoiceModel(MNLDiscreteChoiceModel):
         for calib_var in calib_variables.keys():
             calib_var_name = calib_var.replace('_x_', ':')
             if calib_var_name not in self.model_expression:
-                self.model_expression.add(calib_var_name)
+                if type(self.model_expression) == set:
+                    self.model_expression.add(calib_var_name)
+                else:
+                    self.model_expression.append(calib_var_name)
                 print('Adding calib coeffs: %s' % calib_var_name)
                 coeff = float(calib_variables[calib_var])
 
