@@ -48,7 +48,7 @@ def random_choices(model, choosers, alternatives):
 
 
 def unit_choices(model, choosers, alternatives, enable_supply_correction=None,
-                 zones_as_alternatives=False):
+                zones_as_alternatives=False, custom_prob_function=None):
     """
     Simulate choices using unit choice.  Alternatives table is expanded
     to be of length alternatives.vacant_variables, then choices are simulated
@@ -66,6 +66,17 @@ def unit_choices(model, choosers, alternatives, enable_supply_correction=None,
         Must contain keys "price_col" and "submarket_col" which are set to
         the column names in the zones table which contain the column for
         prices and an identifier which segments zones into submarkets
+    zones_as_alternatives: boolean, optional
+        If zone_id is used as choice column during model estimation but units are 
+        used as alternatives during model prediction, zones with very large capacities 
+        can get disproportionately high probabilities. Setting this parameter to True 
+        corrects for that discrepancy between estimation/prediction contexts by
+        aggregating unit-level probabilities by zone_id and then dividing them by
+        the number of units in each zone. 
+    custom_prob_function: func, optional
+        Function that can be passed to the unit choices method when the user 
+        needs to customize the probabilities or choice logic even further than
+        what the zones_as_alternatives parameter allows
     Returns
     -------
     choices : pandas.Series
@@ -172,7 +183,9 @@ def unit_choices(model, choosers, alternatives, enable_supply_correction=None,
         print("WARNING: Not enough locations for movers",
               "reducing locations to size of movers for performance gain")
         choosers = choosers.head(int(vacant_units.sum()))
-    if zones_as_alternatives==True:
+    if custom_prob_function:
+        choices = custom_prob_function(model, choosers, units, zones_as_alternatives)
+    elif zones_as_alternatives==True:
         choices = choose_with_zones_as_alternatives(model, choosers, units)
     else:
         choices = model.predict(choosers, units, debug=True)
