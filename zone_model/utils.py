@@ -67,14 +67,14 @@ def unit_choices(model, choosers, alternatives, enable_supply_correction=None,
         the column names in the zones table which contain the column for
         prices and an identifier which segments zones into submarkets
     zones_as_alternatives: boolean, optional
-        If zone_id is used as choice column during model estimation but units are 
-        used as alternatives during model prediction, zones with very large capacities 
-        can get disproportionately high probabilities. Setting this parameter to True 
+        If zone_id is used as choice column during model estimation but units are
+        used as alternatives during model prediction, zones with very large capacities
+        can get disproportionately high probabilities. Setting this parameter to True
         corrects for that discrepancy between estimation/prediction contexts by
         aggregating unit-level probabilities by zone_id and then dividing them by
-        the number of units in each zone. 
+        the number of units in each zone.
     custom_prob_function: func, optional
-        Function that can be passed to the unit choices method when the user 
+        Function that can be passed to the unit choices method when the user
         needs to customize the probabilities or choice logic even further than
         what the zones_as_alternatives parameter allows
     Returns
@@ -182,6 +182,7 @@ def unit_choices(model, choosers, alternatives, enable_supply_correction=None,
     if len(choosers) > vacant_units.sum():
         print("WARNING: Not enough locations for movers",
               "reducing locations to size of movers for performance gain")
+        print ("{} choosers will not be placed".format(len(choosers) - vacant_units.sum()))
         choosers = choosers.head(int(vacant_units.sum()))
     if custom_prob_function:
         choices = custom_prob_function(model, choosers, units, zones_as_alternatives)
@@ -697,7 +698,7 @@ def register_choice_model_step(model_name, agents_name, choice_function,
 
         # Test if the simulation was performed
         if not (choices is None):
-            print('There are {} unplaced agents.'.format(choices.isnull().sum()))
+            print('There are {} more unplaced agents.'.format(choices.isnull().sum()))
             orca.get_table(agents_name).update_col_from_series(
                     model.choice_column, choices, cast=True)
     return choice_model_simulate
