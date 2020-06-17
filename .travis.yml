@@ -1,31 +1,22 @@
 language: python
-sudo: false
+
 python:
-- '2.7'
-- '3.5'
+  - '2.7'
+  - '3.5'
+  - '3.6'
+  - '3.7'
+  - '3.8'
 
 install:
-- if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh
-  -O miniconda.sh; else wget http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
-  -O miniconda.sh; fi
-- bash miniconda.sh -b -p $HOME/miniconda
-- export PATH="$HOME/miniconda/bin:$PATH"
-- hash -r
-- conda config --set always_yes yes --set changeps1 no
-- conda update -q conda
-- conda info -a
-- |
-  conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION pip numpy pandas pytest matplotlib scipy statsmodels pyyaml pycodestyle scikit-learn
-- source activate test-environment
-- conda list
-- pip install orca urbansim
-- cd .. && git clone https://github.com/udst/variable_generators.git
-- cd variable_generators && pip install .
-- cd $TRAVIS_BUILD_DIR && pip install .
-- cd zone_model/data && curl -O https://storage.googleapis.com/urbansim/zone_model/model_data.h5
-- cd $TRAVIS_BUILD_DIR/zone_model
+  - pip install .
+  - cd ..
+  - git clone https://github.com/udst/variable_generators.git
+  - cd variable_generators
+  - pip install .
+  - cd ../zone_model/zone_model/data
+  - curl -O https://storage.googleapis.com/urbansim/zone_model/model_data.h5
+  - cd ..
 
 script:
-- pycodestyle .
 - python simulate.py
 # - python evaluate.py # Commenting out for now as interaction terms warrant a revisit of evaluate
