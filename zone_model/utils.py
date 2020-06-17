@@ -6,9 +6,13 @@ import yaml
 import numpy as np
 import pandas as pd
 from patsy import dmatrix
-from sklearn.externals import joblib
 from sklearn.metrics import accuracy_score, r2_score
 from sklearn.model_selection import train_test_split
+
+try:
+    import joblib
+except ModuleNotFoundError as e:
+    from sklearn.externals import joblib  # deprecated in sklearn 0.23
 
 import orca
 from urbansim.utils import misc
