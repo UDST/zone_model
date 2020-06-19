@@ -1,10 +1,3 @@
-# Install setuptools if not installed.
-try:
-    import setuptools
-except ImportError:
-    from ez_setup import use_setuptools
-    use_setuptools()
-
 from setuptools import setup, find_packages
 
 
@@ -24,16 +17,22 @@ setup(
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.3',
-        'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
     ],
     packages=find_packages(exclude=['*.tests']),
     install_requires=[
+        # Also requires 'variable_generators', not available on pypi:
+        # https://github.com/udst/variable_generators
+        'joblib',
         'numpy >= 1.1.0',
-        'pandas >= 0.16.0',
         'orca >= 1.3.0',
-        'urbansim >= 0.1.1',
+        'pandas >= 0.16.0',
+        'patsy',
         'pyyaml',
+        'urbansim >= 0.1.1',
         'scikit-learn >= 0.15.0'
     ]
 )
