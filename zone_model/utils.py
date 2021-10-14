@@ -670,7 +670,7 @@ def register_config_injectable_from_yaml(injectable_name, yaml_file):
     @orca.injectable(injectable_name, cache=True)
     def func():
         with open(os.path.join(misc.configs_dir(), yaml_file)) as f:
-            config = yaml.load(f)
+            config = yaml.safe_load(f)
             return config
     return func
 
